@@ -1,3 +1,7 @@
+.cache
+*vim
+extern*
+build*
 CMakeLists.txt.user
 CMakeCache.txt
 CMakeFiles
