@@ -9,6 +9,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+configure_file(Config.h.in ${CMAKE_BINARY_DIR}/Config.h)
+
 # # check the submodules
 # if(NOT EXISTS "${PROJECT_SOURCE_DIR}/extern/sdl_image/CMakeLists.txt")
 #     message(FATAL_ERROR "The sdl_image submodule was not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
@@ -35,11 +37,10 @@ add_executable(${PROJECT_NAME}
 # add_subdirectory(extern/sdl_image)
 add_subdirectory(extern/glad)
 
-# target_include_directories(
-#         ${PROJECT_NAME}
-#         PUBLIC
-#         ${PROJECT_SOURCE_DIR}/extern/glad/include
-# )
+target_include_directories(${PROJECT_NAME}
+        PUBLIC ${CMAKE_BINARY_DIR}
+        # ${PROJECT_SOURCE_DIR}/extern/glad/include
+)
 
 # SDL2::SDL2main may or may not be available. It is e.g. required by Windows GUI applications
 if(TARGET SDL2::SDL2main)

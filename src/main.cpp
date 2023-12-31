@@ -3,9 +3,12 @@
 #include <sstream>
 #include <glad/glad.h>
 #include <SDL2/SDL.h>
+#include "Config.h"
 
 #define SCREEN_WIDTH 1920
 #define SCREEN_HEIGHT 1080
+
+#define SOURCE_DIR std::string(PROJECT_SOURCE_DIR)
 
 #define SDL_ERROR() fprintf(stderr, "SDL_Error: %s\n", SDL_GetError())
 #define BLACK 0,0,0
@@ -19,12 +22,12 @@ T* SDL(T* ptr) {
     return ptr;
 }
 
-std::string readFile(const char* path) {
+std::string readFile(const std::string& path) {
     std::ifstream inputFile{ path };
     std::stringstream fileString;
 
     if (!inputFile) {
-        fprintf(stderr, "Failed to open file: %s\n", path);
+        std::cerr << "Failed to open file: " << path << "\n";
         exit(EXIT_FAILURE);
     }
 
@@ -96,7 +99,7 @@ int main(void) {
     glEnableVertexAttribArray(0);
     
     // compile vertex shader
-    std::string vertexShaderSource = readFile("../res/shaders/shader.vert");
+    std::string vertexShaderSource = readFile(SOURCE_DIR + "/res/shaders/shader.vert");
     uint32_t vertexShader = glCreateShader(GL_VERTEX_SHADER);
     const char* vs = vertexShaderSource.c_str();
     glShaderSource(vertexShader, 1, &vs, NULL);
@@ -111,7 +114,7 @@ int main(void) {
     }
 
     // compile fragment shader
-    std::string fragmentShaderSource = readFile("../res/shaders/shader.frag");
+    std::string fragmentShaderSource = readFile(SOURCE_DIR + "/res/shaders/shader.frag");
     uint32_t fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     const char* fs = fragmentShaderSource.c_str();
     glShaderSource(fragmentShader, 1, &fs, NULL);
