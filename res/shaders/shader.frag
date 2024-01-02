@@ -1,8 +1,10 @@
 #version 450 core
-in vec4 vertexColor;
 out vec4 FragColor;
+in vec3 ourColor;
+uniform vec4 uColor;
 
 void main()
 {
-    FragColor = vertexColor;
+    //FragColor = vec4(ourColor, 1.0);
+    FragColor = uColor;
 } 
