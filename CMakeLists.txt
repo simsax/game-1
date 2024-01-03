@@ -41,6 +41,7 @@ add_subdirectory(extern/glad)
 
 target_include_directories(${PROJECT_NAME}
         PUBLIC ${CMAKE_BINARY_DIR}
+        PUBLIC ${PROJECT_SOURCE_DIR}/extern/stb_image
         # ${PROJECT_SOURCE_DIR}/extern/glad/include
 )
 
