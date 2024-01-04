@@ -98,11 +98,10 @@ int main(void) {
             ABS_PATH("/res/shaders/shader.frag").c_str());
     shader.bind();
 
-    // texture
-    // gen texture
-    uint32_t texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    // texture 1
+    uint32_t texture1;
+    glGenTextures(1, &texture1);
+    glBindTexture(GL_TEXTURE_2D, texture1);
     // texture wrapping
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -114,7 +113,7 @@ int main(void) {
     int width, height, nrChannels;
     std::string imagePath = ABS_PATH("/res/textures/container.jpg");
 	// flip texture upside down because for opengl bottom left is the starting position
-	stbi_set_flip_vertically_on_load(1);
+	stbi_set_flip_vertically_on_load(true);
     uint8_t *data = stbi_load(imagePath.c_str(), &width, &height, &nrChannels, 0); 
     if (data == nullptr) {
         fprintf(stderr, "Failed at loading image: %s\n", imagePath.c_str());
@@ -125,6 +124,39 @@ int main(void) {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
 
+    // texture 2
+    uint32_t texture2;
+    glGenTextures(1, &texture2);
+    glBindTexture(GL_TEXTURE_2D, texture2);
+    // texture wrapping
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // texture filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // load second image
+    imagePath = ABS_PATH("/res/textures/awesomeface.png");
+    data = stbi_load(imagePath.c_str(), &width, &height, &nrChannels, 0);
+    stbi_set_flip_vertically_on_load(true);
+    if (data == nullptr) {
+        fprintf(stderr, "Failed at loading image: %s\n", imagePath.c_str());
+        exit(EXIT_FAILURE);
+    }
+    stbi_image_free(data);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    shader.bind();
+    shader.setUniform1i("texture1", 0);
+    shader.setUniform1i("texture2", 1);
+
+    // this was in the render loop
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture1);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, texture2);
 
     int quit = 0;
     while(!quit) {
@@ -149,6 +181,7 @@ int main(void) {
         {
             glClearColor(BLACK, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
+
 
             /* float time = SDL_GetTicks() / 1000.0f; */
             /* float greenValue = sin(time) * 0.5 + 0.5; */
