@@ -1,6 +1,6 @@
 .cache
 *vim
-extern*
+extern/glad/*
 build*
 CMakeLists.txt.user
 CMakeCache.txt

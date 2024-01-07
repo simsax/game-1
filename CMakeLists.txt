@@ -11,10 +11,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 configure_file(Config.h.in ${CMAKE_BINARY_DIR}/Config.h)
 
-# # check the submodules
-# if(NOT EXISTS "${PROJECT_SOURCE_DIR}/extern/sdl_image/CMakeLists.txt")
-#     message(FATAL_ERROR "The sdl_image submodule was not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
-# endif(
+# check the submodules
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/extern/glm/CMakeLists.txt")
+    message(FATAL_ERROR "The glm submodule was not downloaded! Please update submodules and try again.")
+endif()
 
 # Create an option to switch between a system sdl library and a vendored sdl library
 option(MYGAME_VENDORED "Use vendored libraries" OFF)
@@ -35,13 +35,13 @@ add_executable(${PROJECT_NAME}
     src/shader.cpp
 )
 
-# add_subdirectory(extern/sdl2_gfx)
-# add_subdirectory(extern/sdl_image)
 add_subdirectory(extern/glad)
+add_subdirectory(extern/glm)
 
 target_include_directories(${PROJECT_NAME}
         PUBLIC ${CMAKE_BINARY_DIR}
         PUBLIC ${PROJECT_SOURCE_DIR}/extern/stb_image
+        PUBLIC ${PROJECT_SOURCE_DIR}/extern/glm
         # ${PROJECT_SOURCE_DIR}/extern/glad/include
 )
 
@@ -52,7 +52,7 @@ if(TARGET SDL2::SDL2main)
 endif()
 
 # Link to the actual SDL2 library. SDL2::SDL2 is the shared SDL library, SDL2::SDL2-static is the static SDL libarary.
-target_link_libraries(${PROJECT_NAME} PRIVATE SDL2::SDL2 glad)
+target_link_libraries(${PROJECT_NAME} PRIVATE SDL2::SDL2 glad glm)
 
 
 set(GCC_COMPILE_OPTIONS "-Wall;-Wextra;-pedantic;")

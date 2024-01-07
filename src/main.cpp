@@ -36,7 +36,7 @@ int main(void) {
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
     SDL_Window *window = SDL<SDL_Window>(SDL_CreateWindow(
@@ -183,11 +183,17 @@ int main(void) {
             glClear(GL_COLOR_BUFFER_BIT);
 
 
-            /* float time = SDL_GetTicks() / 1000.0f; */
+            float time = SDL_GetTicks() / 1000.0f;
             /* float greenValue = sin(time) * 0.5 + 0.5; */
 
             shader.bind();
             /* shader.setUniform4f("uColor", 0, greenValue, 0, 1); */
+
+            // transform
+            glm::mat4 trans = glm::mat4(1.0f);
+            trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
+            trans = glm::rotate(trans, glm::radians(time), glm::vec3(0.0f, 0.0f, 1.0f));
+            shader.SetUniformMatrix4fv("transform", trans);
 
             glBindVertexArray(vao);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);

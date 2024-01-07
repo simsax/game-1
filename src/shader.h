@@ -5,6 +5,9 @@
 #include <string>
 #include <unordered_map>
 #include <glad/glad.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 class Shader
 {
@@ -17,6 +20,7 @@ public:
 	void setUniform1iv(const char* name, int length, int* v);
 	void setUniform1f(const char* name, float v);
 	void setUniform4f(const char* name, float v0, float v1, float v2, float v3);
+    void SetUniformMatrix4fv(const char* name, const glm::mat4& matrix);
 
 private:
     uint32_t m_ProgramId;
