@@ -10,8 +10,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+// this will be changed dynamically to allow resizing
 #define SCREEN_WIDTH 1920
 #define SCREEN_HEIGHT 1080
+#define ASPECT_RATIO ((float)SCREEN_WIDTH / (float)SCREEN_HEIGHT)
 
 #define ABS_PATH(x) (std::string(PROJECT_SOURCE_DIR) + (x))
 
@@ -60,6 +62,7 @@ int main(void) {
         -0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 1.0f,   0.0f, 0.0f,  // bottom left
         -0.5f,  0.5f, 0.0f,     1.0f, 0.0f, 1.0f,   0.0f, 1.0f   // top left 
     };
+
 
     uint32_t indices[] = {  // note that we start from 0!
         0, 1, 3,   // first triangle
@@ -182,18 +185,30 @@ int main(void) {
             glClearColor(BLACK, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
 
-
             float time = SDL_GetTicks() / 1000.0f;
             /* float greenValue = sin(time) * 0.5 + 0.5; */
 
             shader.bind();
             /* shader.setUniform4f("uColor", 0, greenValue, 0, 1); */
 
-            // transform
-            glm::mat4 trans = glm::mat4(1.0f);
-            trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
-            trans = glm::rotate(trans, glm::radians(time), glm::vec3(0.0f, 0.0f, 1.0f));
-            shader.SetUniformMatrix4fv("transform", trans);
+            // weird rotating plane
+
+            // order of transformation is reversed (the last one is the first which is applied)
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(0.5f, -0.5f, 0.0f));
+            model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f)); 
+            model = glm::rotate(model, time, glm::vec3(0.0f, 0.0f, -1.0f));
+
+            glm::mat4 view = glm::mat4(1.0f);
+            // note that we're translating the scene in the reverse direction of where we want to move
+            view = glm::translate(view, glm::vec3(0.0f, 0.0f, -2.0f)); 
+            
+            glm::mat4 projection = glm::perspective(glm::radians(70.0f), ASPECT_RATIO, 0.1f, 100.0f);
+
+            // TODO: figure out if better to compute mvp matrix on cpu vs doing it in vertex shader
+            shader.SetUniformMatrix4fv("model", model);
+            shader.SetUniformMatrix4fv("view", view);
+            shader.SetUniformMatrix4fv("projection", projection);
 
             glBindVertexArray(vao);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
