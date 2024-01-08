@@ -3,6 +3,7 @@
 #include <iostream>
 #include <glad/glad.h>
 #include <SDL2/SDL.h>
+#include <array>
 #include "Config.h"
 #include "utils.h"
 #include "shader.h"
@@ -28,6 +29,12 @@ T* SDL(T* ptr) {
     }
     return ptr;
 }
+
+struct Vertex {
+    glm::vec3 position;
+    glm::vec3 color;
+    glm::vec2 texture;
+};
 
 int main(void) {
     // no error checking
@@ -55,19 +62,61 @@ int main(void) {
 
     // opengl stuff
 
-    float vertices[] = {
-        // positions            // colors
-         0.5f,  0.5f, 0.0f,     1.0f, 0.0f, 0.0f,   1.0f, 1.0f,  // top right
-         0.5f, -0.5f, 0.0f,     0.0f, 1.0f, 0.0f,   1.0f, 0.0f,  // bottom right
-        -0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 1.0f,   0.0f, 0.0f,  // bottom left
-        -0.5f,  0.5f, 0.0f,     1.0f, 0.0f, 1.0f,   0.0f, 1.0f   // top left 
-    };
+    /* std::array<Vertex, 4> vertices = {{ */
+    /*     {glm::vec3(0.5f,  0.5f, 0.0f),    glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},  // top right */
+    /*     {glm::vec3(0.5f, -0.5f, 0.0f),    glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},  // bottom right */
+    /*     {glm::vec3(-0.5f, -0.5f, 0.0f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},  // bottom left */
+    /*     {glm::vec3(-0.5f,  0.5f, 0.0f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)}   // top left */ 
+    /* }}; */
 
+    std::array<Vertex, 24> vertices = {{
+        // front
+        {glm::vec3(0.5f,   0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(0.5f,  -0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f, 0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(-0.5f,  0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
 
-    uint32_t indices[] = {  // note that we start from 0!
-        0, 1, 3,   // first triangle
-        1, 2, 3    // second triangle
-    };  
+        // back
+        {glm::vec3(0.5f,   0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f,  -0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+
+        // down
+        {glm::vec3(0.5f,  -0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(0.5f,  -0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
+
+        // up
+        {glm::vec3(0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f, 0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(-0.5f, 0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+
+        // left
+        {glm::vec3(-0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f,  0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
+
+        // right
+        {glm::vec3(0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(0.5f, -0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+    }};
+
+    std::array<uint32_t, 36> indices;
+    int ix = 0;
+    for (int i = 0; i < 24; i += 4) {
+        indices[ix++] = i + 0;
+        indices[ix++] = i + 1;
+        indices[ix++] = i + 3;
+        indices[ix++] = i + 1;
+        indices[ix++] = i + 2;
+        indices[ix++] = i + 3;
+    }
 
     // create vao
     uint32_t vao;
@@ -78,13 +127,13 @@ int main(void) {
     uint32_t vbo;
     glGenBuffers(1, &vbo);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices.data(), GL_STATIC_DRAW);
 
     // create ebo (if not using triangle_strip)
     uint32_t ebo;
     glGenBuffers(1, &ebo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices.data(), GL_STATIC_DRAW);
 
     // specify vertex attributes
     float stride = 8 * sizeof(float);
@@ -161,6 +210,8 @@ int main(void) {
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, texture2);
 
+    glEnable(GL_DEPTH_TEST);
+
     int quit = 0;
     while(!quit) {
         SDL_Event event;
@@ -183,7 +234,7 @@ int main(void) {
         // render
         {
             glClearColor(BLACK, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             float time = SDL_GetTicks() / 1000.0f;
             /* float greenValue = sin(time) * 0.5 + 0.5; */
@@ -195,7 +246,7 @@ int main(void) {
 
             // order of transformation is reversed (the last one is the first which is applied)
             glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(0.5f, -0.5f, 0.0f));
+            /* model = glm::translate(model, glm::vec3(0.5f, -0.5f, 0.0f)); */
             model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f)); 
             model = glm::rotate(model, time, glm::vec3(0.0f, 0.0f, -1.0f));
 
@@ -211,7 +262,7 @@ int main(void) {
             shader.SetUniformMatrix4fv("projection", projection);
 
             glBindVertexArray(vao);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
             /* glDrawArrays(GL_TRIANGLES, 0, 3); */
         }
 
