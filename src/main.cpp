@@ -222,10 +222,12 @@ int main(void) {
     // some globals (outside the game loop)
     bool quit = false;
 
-    bool up = false;
-    bool down = false;
+    bool forward = false;
+    bool backwards = false;
     bool left = false;
     bool right = false;
+    bool up = false;
+    bool down = false;
 
     float deltaTime = 0.0f; // time between current and last frame
     float lastFrame = 0.0f; // time of last frame
@@ -234,7 +236,7 @@ int main(void) {
     glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f,  3.0f);
     glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
     glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
-    static constexpr float cameraSpeed = 2.5f;
+    static constexpr float cameraSpeed = 5.0f;
     float yaw = -90.0f;
     float pitch = 0.0f;
     int xoffset = 0;
@@ -257,16 +259,22 @@ int main(void) {
                         quit = true;
                         break;
                     case SDLK_w:
-                        up = true;
+                        forward = true;
                         break;
                     case SDLK_a:
                         left = true;
                         break;
                     case SDLK_s:
-                        down = true;
+                        backwards = true;
                         break;
                     case SDLK_d:
                         right = true;
+                        break;
+                    case SDLK_SPACE:
+                        up = true;
+                        break;
+                    case SDLK_LCTRL:
+                        down = true;
                         break;
                     default:
                         break;
@@ -275,16 +283,22 @@ int main(void) {
                 case SDL_KEYUP:
                     switch (event.key.keysym.sym) {
                     case SDLK_w:
-                        up = false;
+                        forward = false;
                         break;
                     case SDLK_a:
                         left = false;
                         break;
                     case SDLK_s:
-                        down = false;
+                        backwards = false;
                         break;
                     case SDLK_d:
                         right = false;
+                        break;
+                    case SDLK_SPACE:
+                        up = false;
+                        break;
+                    case SDLK_LCTRL:
+                        down = false;
                         break;
                     default:
                         break;
@@ -344,21 +358,24 @@ int main(void) {
         }
 
         // update
-
-
         float time = SDL_GetTicks() / 1000.0f;
         deltaTime = time - lastFrame;
         lastFrame = time;
         float cameraOffset = cameraSpeed * deltaTime;
+        glm::vec3 yMasked = glm::vec3(1.0f, 0.0f, 1.0f);
 
-        if (up)
-            cameraPos += cameraOffset * cameraFront;
-        if (down)
-            cameraPos -= cameraOffset * cameraFront;
+        if (forward)
+            cameraPos += yMasked * cameraOffset * cameraFront;
+        if (backwards)
+            cameraPos -= yMasked * cameraOffset * cameraFront;
         if (left)
-            cameraPos -= cameraOffset * glm::normalize(glm::cross(cameraFront, cameraUp));
+            cameraPos -= yMasked * cameraOffset * glm::normalize(glm::cross(cameraFront, cameraUp));
         if (right)
-            cameraPos += cameraOffset * glm::normalize(glm::cross(cameraFront, cameraUp));
+            cameraPos += yMasked * cameraOffset * glm::normalize(glm::cross(cameraFront, cameraUp));
+        if (up)
+            cameraPos.y += cameraOffset;
+        if (down)
+            cameraPos.y -= cameraOffset;
 
         // render
         {
