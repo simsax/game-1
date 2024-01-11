@@ -39,6 +39,13 @@ struct Vertex {
     glm::vec2 texture;
 };
 
+int tiles[5][5] = {
+    { 1, 1, 1, 1, 1 },
+    { 1, 1, 1, 1, 1 },
+    { 1, 1, 1, 1, 1 },
+    { 1, 1, 1, 1, 1 },
+    { 1, 1, 1, 1, 1 },
+};
 
 int main(void) {
     // no error checking
@@ -69,14 +76,28 @@ int main(void) {
 
     // opengl stuff
 
-    /* std::array<Vertex, 4> vertices = {{ */
-    /*     {glm::vec3(0.5f,  0.5f, 0.0f),    glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},  // top right */
-    /*     {glm::vec3(0.5f, -0.5f, 0.0f),    glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},  // bottom right */
-    /*     {glm::vec3(-0.5f, -0.5f, 0.0f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},  // bottom left */
-    /*     {glm::vec3(-0.5f,  0.5f, 0.0f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)}   // top left */ 
-    /* }}; */
+    // for the grid, start at (0,0), iterate over every tile, keeping track of the last coordinate
+    // and generate a quad of size 1 in the XY plane (z = 0, cube will be translated up by model matrix)
+    // each quad will have a margin (I think I can do this in the fragment shader).
+    // the cube will have margins too
 
-    std::array<Vertex, 24> vertices = {{
+    // need to abstract rendering of basic shapes like a quad at coord x,y,z
+    static constexpr int numTilesVertices = 25 * 4;
+    static constexpr int numTilesIndices = 25 * 6;
+    std::array<Vertex, numTilesVertices> tilesVertices;
+    int ix = 0;
+    for (int i = 0; i < 5; i++) {
+        for (int j = 0; j < 5; j++) {
+            tilesVertices[ix++] = {glm::vec3(j,   0.0f, i),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 0.0f)};
+            tilesVertices[ix++] = {glm::vec3(j + 1,   0.0f, i),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 0.0f)};
+            tilesVertices[ix++] = {glm::vec3(j + 1,  0.0f, i + 1),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 1.0f)};
+            tilesVertices[ix++] = {glm::vec3(j,  0.0f, i + 1),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 1.0f)};
+        }
+    }
+
+    static constexpr int numCubeVertices = 6 * 4;
+    static constexpr int numCubeIndices = 6 * 6;
+    std::array<Vertex, numCubeVertices> cubeVertices = {{
         // front
         {glm::vec3(0.5f,   0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
         {glm::vec3(0.5f,  -0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
@@ -114,15 +135,26 @@ int main(void) {
         {glm::vec3(0.5f, -0.5f,  0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
     }};
 
-    std::array<uint32_t, 36> indices;
-    int ix = 0;
-    for (int i = 0; i < 24; i += 4) {
+    std::array<uint32_t, numCubeIndices> indices;
+    ix = 0;
+    for (int i = 0; i < numCubeVertices; i += 4) {
         indices[ix++] = i + 0;
         indices[ix++] = i + 1;
         indices[ix++] = i + 3;
         indices[ix++] = i + 1;
         indices[ix++] = i + 2;
         indices[ix++] = i + 3;
+    }
+
+    ix = 0;
+    std::array<uint32_t, numTilesIndices> tilesIndices;
+    for (int i = 0; i < numTilesVertices; i += 4) {
+        tilesIndices[ix++] = i + 0;
+        tilesIndices[ix++] = i + 1;
+        tilesIndices[ix++] = i + 3;
+        tilesIndices[ix++] = i + 1;
+        tilesIndices[ix++] = i + 2;
+        tilesIndices[ix++] = i + 3;
     }
 
     // create vao
@@ -134,7 +166,7 @@ int main(void) {
     uint32_t vbo;
     glGenBuffers(1, &vbo);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices.data(), GL_STATIC_DRAW);
 
     // create ebo (if not using triangle_strip)
     uint32_t ebo;
@@ -153,8 +185,8 @@ int main(void) {
     
     // compile and link shaders
     Shader shader = Shader(
-            ABS_PATH("/res/shaders/shader.vert").c_str(),
-            ABS_PATH("/res/shaders/shader.frag").c_str());
+            ABS_PATH("/res/shaders/cubeShader.vert").c_str(),
+            ABS_PATH("/res/shaders/cubeShader.frag").c_str());
     shader.bind();
 
     // texture 1
@@ -196,8 +228,8 @@ int main(void) {
 
     // load second image
     imagePath = ABS_PATH("/res/textures/awesomeface.png");
-    data = stbi_load(imagePath.c_str(), &width, &height, &nrChannels, 0);
     stbi_set_flip_vertically_on_load(true);
+    data = stbi_load(imagePath.c_str(), &width, &height, &nrChannels, 0);
     if (data == nullptr) {
         fprintf(stderr, "Failed at loading image: %s\n", imagePath.c_str());
         exit(EXIT_FAILURE);
@@ -211,11 +243,38 @@ int main(void) {
     shader.setUniform1i("texture1", 0);
     shader.setUniform1i("texture2", 1);
 
-    // this was in the render loop
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture1);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, texture2);
+    // same as before for tiles
+    // create vao
+    uint32_t tilesVao;
+    glGenVertexArrays(1, &tilesVao);
+    glBindVertexArray(tilesVao);
+
+    // create vbo
+    uint32_t tilesVbo;
+    glGenBuffers(1, &tilesVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, tilesVbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(tilesVertices), tilesVertices.data(), GL_STATIC_DRAW);
+
+    // ebo
+    uint32_t tilesEbo;
+    glGenBuffers(1, &tilesEbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tilesEbo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(tilesIndices), tilesIndices.data(), GL_STATIC_DRAW);
+
+    // vertex attributes
+    stride = 8 * sizeof(float);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*) 0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*) (3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*) (6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+
+    // compile and link shaders
+    Shader shader2 = Shader(
+            ABS_PATH("/res/shaders/cubeShader.vert").c_str(),
+            ABS_PATH("/res/shaders/tileShader.frag").c_str());
+    shader2.bind();
 
     glEnable(GL_DEPTH_TEST);
 
@@ -387,10 +446,14 @@ int main(void) {
             shader.bind();
             /* shader.setUniform4f("uColor", 0, greenValue, 0, 1); */
 
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, texture1);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, texture2);
 
             // order of transformation is reversed (the last one is the first which is applied)
             glm::mat4 model = glm::mat4(1.0f);
-            /* model = glm::translate(model, glm::vec3(0.5f, -0.5f, 0.0f)); */
+            model = glm::translate(model, glm::vec3(0.5f, 0.5f, 0.5f));
             /* model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f)); */ 
             /* model = glm::rotate(model, time, glm::vec3(1.0f, 1.0f, 1.0f)); */
 
@@ -400,12 +463,6 @@ int main(void) {
             
             glm::mat4 projection = glm::perspective(glm::radians(fov), ASPECT_RATIO, 0.1f, 100.0f);
 
-            /* glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f); */
-            /* glm::vec3 cameraTarget = glm::vec3(0.0f); */
-            /* glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget); */
-            /* glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f); */
-            /* glm::vec3 cameraRight = glm::normalize(glm::cross(up, cameraDirection)); */
-            /* glm::vec3 cameraUp = glm::cross(cameraDirection, cameraRight); */
             view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp); 
 
             // TODO: figure out if better to compute mvp matrix on cpu vs doing it in vertex shader
@@ -415,7 +472,20 @@ int main(void) {
 
             glBindVertexArray(vao);
             glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-            /* glDrawArrays(GL_TRIANGLES, 0, 3); */
+
+            shader2.bind();
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, texture2);
+            model = glm::mat4(1.0f);
+            view = glm::mat4(1.0f);
+            view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp); 
+
+            shader2.SetUniformMatrix4fv("model", model);
+            shader2.SetUniformMatrix4fv("view", view);
+            shader2.SetUniformMatrix4fv("projection", projection);
+
+            glBindVertexArray(tilesVao);
+            glDrawElements(GL_TRIANGLES, tilesIndices.size(), GL_UNSIGNED_INT, 0);
         }
 
         SDL_GL_SwapWindow(window);
