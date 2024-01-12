@@ -1,7 +1,7 @@
 #!/bin/bash
 
 cd build
-cmake -B . -S .. -DCMAKE_BUILD_TYPE=Release
+cmake -B . -S .. -DCMAKE_BUILD_TYPE=Debug
 
 if [ $? -ne 0 ]; then
     echo "CMake failed"

@@ -10,9 +10,14 @@
 #include "Config.h"
 #include "utils.h"
 #include "shader.h"
+#include "vao.h"
 // move this to texture class
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+
+#ifndef NDEBUG
+#define DEBUG
+#endif
 
 // this will be changed dynamically to allow resizing
 #define SCREEN_WIDTH 1920
@@ -47,17 +52,69 @@ int tiles[5][5] = {
     { 1, 1, 1, 1, 1 },
 };
 
-int main(void) {
+void APIENTRY glDebugOutput(GLenum source, 
+                            GLenum type, 
+                            unsigned int id, 
+                            GLenum severity, 
+                            GLsizei length, 
+                            const char *message, 
+                            const void *userParam)
+{
+    // ignore non-significant error/warning codes
+    if(id == 131169 || id == 131185 || id == 131218 || id == 131204) return; 
+
+    std::cout << "---------------" << "/n";
+    std::cout << "Debug message (" << id << "): " <<  message << "/n";
+
+    switch (source)
+    {
+        case GL_DEBUG_SOURCE_API:             std::cout << "Source: API"; break;
+        case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   std::cout << "Source: Window System"; break;
+        case GL_DEBUG_SOURCE_SHADER_COMPILER: std::cout << "Source: Shader Compiler"; break;
+        case GL_DEBUG_SOURCE_THIRD_PARTY:     std::cout << "Source: Third Party"; break;
+        case GL_DEBUG_SOURCE_APPLICATION:     std::cout << "Source: Application"; break;
+        case GL_DEBUG_SOURCE_OTHER:           std::cout << "Source: Other"; break;
+    } std::cout << "/n";
+
+    switch (type)
+    {
+        case GL_DEBUG_TYPE_ERROR:               std::cout << "Type: Error"; break;
+        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: std::cout << "Type: Deprecated Behaviour"; break;
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  std::cout << "Type: Undefined Behaviour"; break; 
+        case GL_DEBUG_TYPE_PORTABILITY:         std::cout << "Type: Portability"; break;
+        case GL_DEBUG_TYPE_PERFORMANCE:         std::cout << "Type: Performance"; break;
+        case GL_DEBUG_TYPE_MARKER:              std::cout << "Type: Marker"; break;
+        case GL_DEBUG_TYPE_PUSH_GROUP:          std::cout << "Type: Push Group"; break;
+        case GL_DEBUG_TYPE_POP_GROUP:           std::cout << "Type: Pop Group"; break;
+        case GL_DEBUG_TYPE_OTHER:               std::cout << "Type: Other"; break;
+    } std::cout << "/n";
+    
+    switch (severity)
+    {
+        case GL_DEBUG_SEVERITY_HIGH:         std::cout << "Severity: high"; break;
+        case GL_DEBUG_SEVERITY_MEDIUM:       std::cout << "Severity: medium"; break;
+        case GL_DEBUG_SEVERITY_LOW:          std::cout << "Severity: low"; break;
+        case GL_DEBUG_SEVERITY_NOTIFICATION: std::cout << "Severity: notification"; break;
+    } std::cout << "/n";
+    std::cout << "/n";
+}
+
+int main() {
     // no error checking
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         SDL_ERROR();
         exit(EXIT_FAILURE);
     }
 
+    // I am only going to use opengl 4.1 features, besides the debug output (available from 4.3)
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+#ifdef DEBUG
+    printf("DEBUG ON\n");
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+#endif
 
     SDL_Window *window = SDL<SDL_Window>(SDL_CreateWindow(
         "Game 1",
@@ -74,7 +131,26 @@ int main(void) {
 
     gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress);
 
-    // opengl stuff
+    // opengl loaded
+#ifdef DEBUG
+    int flags;
+    glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
+    if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
+    {
+        // initialize debug output 
+        printf("Debug output is on\n");
+        glEnable(GL_DEBUG_OUTPUT);
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS); 
+        glDebugMessageCallback(glDebugOutput, nullptr);
+        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+        // errors only
+        /* glDebugMessageControl(GL_DEBUG_SOURCE_API, */ 
+        /*                       GL_DEBUG_TYPE_ERROR, */ 
+        /*                       GL_DEBUG_SEVERITY_HIGH, */
+        /*                       0, nullptr, GL_TRUE); */ 
+    }
+#endif
+
 
     // for the grid, start at (0,0), iterate over every tile, keeping track of the last coordinate
     // and generate a quad of size 1 in the XY plane (z = 0, cube will be translated up by model matrix)
@@ -84,20 +160,21 @@ int main(void) {
     // need to abstract rendering of basic shapes like a quad at coord x,y,z
     static constexpr int numTilesVertices = 25 * 4;
     static constexpr int numTilesIndices = 25 * 6;
-    std::array<Vertex, numTilesVertices> tilesVertices;
-    int ix = 0;
+    std::vector<Vertex> tilesVertices;
+    tilesVertices.reserve(numTilesVertices);
+
     for (int i = 0; i < 5; i++) {
         for (int j = 0; j < 5; j++) {
-            tilesVertices[ix++] = {glm::vec3(j,   0.0f, i),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 0.0f)};
-            tilesVertices[ix++] = {glm::vec3(j + 1,   0.0f, i),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 0.0f)};
-            tilesVertices[ix++] = {glm::vec3(j + 1,  0.0f, i + 1),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 1.0f)};
-            tilesVertices[ix++] = {glm::vec3(j,  0.0f, i + 1),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 1.0f)};
+            tilesVertices.emplace_back(glm::vec3(j,   0.0f, i),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 0.0f));
+            tilesVertices.emplace_back(glm::vec3(j + 1,   0.0f, i),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 0.0f));
+            tilesVertices.emplace_back(glm::vec3(j + 1,  0.0f, i + 1),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 1.0f));
+            tilesVertices.emplace_back(glm::vec3(j,  0.0f, i + 1),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 1.0f));
         }
     }
 
     static constexpr int numCubeVertices = 6 * 4;
     static constexpr int numCubeIndices = 6 * 6;
-    std::array<Vertex, numCubeVertices> cubeVertices = {{
+    std::vector<Vertex> cubeVertices = {
         // front
         {glm::vec3(0.5f,   0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
         {glm::vec3(0.5f,  -0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
@@ -133,55 +210,37 @@ int main(void) {
         {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
         {glm::vec3(0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
         {glm::vec3(0.5f, -0.5f,  0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
-    }};
+    };
 
-    std::array<uint32_t, numCubeIndices> indices;
-    ix = 0;
+    std::vector<uint32_t> cubeIndices;
+    cubeIndices.reserve(numCubeIndices);
     for (int i = 0; i < numCubeVertices; i += 4) {
-        indices[ix++] = i + 0;
-        indices[ix++] = i + 1;
-        indices[ix++] = i + 3;
-        indices[ix++] = i + 1;
-        indices[ix++] = i + 2;
-        indices[ix++] = i + 3;
+        cubeIndices.emplace_back(i + 0);
+        cubeIndices.emplace_back(i + 1);
+        cubeIndices.emplace_back(i + 3);
+        cubeIndices.emplace_back(i + 1);
+        cubeIndices.emplace_back(i + 2);
+        cubeIndices.emplace_back(i + 3);
     }
 
-    ix = 0;
-    std::array<uint32_t, numTilesIndices> tilesIndices;
+    std::vector<uint32_t> tilesIndices;
+    tilesIndices.reserve(numTilesIndices);
     for (int i = 0; i < numTilesVertices; i += 4) {
-        tilesIndices[ix++] = i + 0;
-        tilesIndices[ix++] = i + 1;
-        tilesIndices[ix++] = i + 3;
-        tilesIndices[ix++] = i + 1;
-        tilesIndices[ix++] = i + 2;
-        tilesIndices[ix++] = i + 3;
+        tilesIndices.push_back(i + 0);
+        tilesIndices.push_back(i + 1);
+        tilesIndices.push_back(i + 3);
+        tilesIndices.push_back(i + 1);
+        tilesIndices.push_back(i + 2);
+        tilesIndices.push_back(i + 3);
     }
 
-    // create vao
-    uint32_t vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
+    std::vector<Layout> cubeLayout = {
+        { GL_FLOAT, 3 },
+        { GL_FLOAT, 3 },
+        { GL_FLOAT, 2 }
+    };
 
-    // create vbo
-    uint32_t vbo;
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices.data(), GL_STATIC_DRAW);
-
-    // create ebo (if not using triangle_strip)
-    uint32_t ebo;
-    glGenBuffers(1, &ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices.data(), GL_STATIC_DRAW);
-
-    // specify vertex attributes
-    float stride = 8 * sizeof(float);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*) 0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*) (3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*) (6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
+    Vao cubeVao = Vao(cubeVertices, cubeIndices, cubeLayout, GL_STATIC_DRAW);
     
     // compile and link shaders
     Shader shader = Shader(
@@ -243,32 +302,13 @@ int main(void) {
     shader.setUniform1i("texture1", 0);
     shader.setUniform1i("texture2", 1);
 
-    // same as before for tiles
-    // create vao
-    uint32_t tilesVao;
-    glGenVertexArrays(1, &tilesVao);
-    glBindVertexArray(tilesVao);
+    std::vector<Layout> tilesLayout = {
+        { GL_FLOAT, 3 },
+        { GL_FLOAT, 3 },
+        { GL_FLOAT, 2 }
+    };
 
-    // create vbo
-    uint32_t tilesVbo;
-    glGenBuffers(1, &tilesVbo);
-    glBindBuffer(GL_ARRAY_BUFFER, tilesVbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(tilesVertices), tilesVertices.data(), GL_STATIC_DRAW);
-
-    // ebo
-    uint32_t tilesEbo;
-    glGenBuffers(1, &tilesEbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tilesEbo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(tilesIndices), tilesIndices.data(), GL_STATIC_DRAW);
-
-    // vertex attributes
-    stride = 8 * sizeof(float);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*) 0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*) (3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*) (6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
+    Vao tilesVao = Vao(tilesVertices, tilesIndices, tilesLayout, GL_STATIC_DRAW);
 
     // compile and link shaders
     Shader shader2 = Shader(
@@ -470,8 +510,8 @@ int main(void) {
             shader.SetUniformMatrix4fv("view", view);
             shader.SetUniformMatrix4fv("projection", projection);
 
-            glBindVertexArray(vao);
-            glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+            glBindVertexArray(cubeVao.getVaoId());
+            glDrawElements(GL_TRIANGLES, cubeVao.getCountIndices(), GL_UNSIGNED_INT, 0);
 
             shader2.bind();
             glActiveTexture(GL_TEXTURE0);
@@ -484,8 +524,8 @@ int main(void) {
             shader2.SetUniformMatrix4fv("view", view);
             shader2.SetUniformMatrix4fv("projection", projection);
 
-            glBindVertexArray(tilesVao);
-            glDrawElements(GL_TRIANGLES, tilesIndices.size(), GL_UNSIGNED_INT, 0);
+            glBindVertexArray(tilesVao.getVaoId());
+            glDrawElements(GL_TRIANGLES, tilesVao.getCountIndices(), GL_UNSIGNED_INT, 0);
         }
 
         SDL_GL_SwapWindow(window);

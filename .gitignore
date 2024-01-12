@@ -1,4 +1,6 @@
 .cache
+cmake-build*
+*.idea
 *vim
 extern/glad/*
 build*

@@ -2,12 +2,17 @@ cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
 project(game-1)
 
-set(CMAKE_BUILD_TYPE Debug)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING
+            "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
+            FORCE)
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 
 configure_file(Config.h.in ${CMAKE_BINARY_DIR}/Config.h)
 
@@ -33,6 +38,7 @@ add_executable(${PROJECT_NAME}
     src/main.cpp
     src/utils.cpp
     src/shader.cpp
+    src/vao.cpp
 )
 
 add_subdirectory(extern/glad)
