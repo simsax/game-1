@@ -19,7 +19,7 @@ public:
     template <typename T>
     inline Vao(const std::vector<T>& vertices, const std::vector<uint32_t>& indices,
             const std::vector<Layout>& layouts, GLenum usage):
-        m_Vao(0), m_Vbo(0), m_Ebo(0), m_Stride(0), m_IndicesCount(indices.size())
+        m_Vao(0), m_Vbo(0), m_Ebo(0), m_Stride(sizeof(T)), m_IndicesCount(indices.size())
     {
         // create vao
         glGenVertexArrays(1, &m_Vao);
@@ -36,11 +36,6 @@ public:
         // TODO: figure out if dynamic/static/stream
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(T), indices.data(), GL_STATIC_DRAW);
 
-        // calculate stride
-        for (size_t i = 0; i < layouts.size(); i++) {
-            m_Stride += layouts[i].count * getSizeOfType(layouts[i].type);
-        }
-
         // specify vertex attributes
         uint64_t offset = 0;
         for (size_t i = 0; i < layouts.size(); i++) {
@@ -54,10 +49,10 @@ public:
         }
     }
 
-    void bind();
-    void unbind();
-    uint32_t getCountIndices();
-    uint32_t getVaoId();
+    void Bind();
+    void Unbind();
+    uint32_t GetCountIndices();
+    uint32_t GetVaoId();
 private:
     uint32_t m_Vao;
     uint32_t m_Vbo;

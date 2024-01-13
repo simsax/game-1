@@ -20,18 +20,18 @@ uint32_t getSizeOfType(GLenum type) {
 }
 
 
-void Vao::bind() {
+void Vao::Bind() {
     glBindVertexArray(m_Vao);
 }
 
-void Vao::unbind() {
+void Vao::Unbind() {
     glBindVertexArray(0);
 }
 
-uint32_t Vao::getCountIndices() {
+uint32_t Vao::GetCountIndices() {
     return m_IndicesCount;
 }
 
-uint32_t Vao::getVaoId() {
+uint32_t Vao::GetVaoId() {
     return m_Vao;
 }

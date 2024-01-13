@@ -46,15 +46,15 @@ Shader::Shader(const char* vertexShaderPath, const char* fragmentShaderPath) {
     glDeleteShader(fragmentShader);
 }
 
-void Shader::bind() {
+void Shader::Bind() {
     glUseProgram(m_ProgramId);
 }
 
-void Shader::unbind() {
+void Shader::Unbind() {
     glUseProgram(0);
 }
 
-GLint Shader::getUniformLocation(const char* name)
+GLint Shader::GetUniformLocation(const char* name)
 {
 	if (m_UniformLocationCache.find(name) != m_UniformLocationCache.end())
 		return m_UniformLocationCache[name];
@@ -68,22 +68,22 @@ GLint Shader::getUniformLocation(const char* name)
 	return location;
 }
 
-void Shader::setUniform1i(const char* name, int v) {
-    glUniform1i(getUniformLocation(name), v);
+void Shader::SetUniform1i(const char* name, int v) {
+    glUniform1i(GetUniformLocation(name), v);
 }
 
-void Shader::setUniform1iv(const char* name, int length, int* v) {
-    glUniform1iv(getUniformLocation(name), length, v);
+void Shader::SetUniform1iv(const char* name, int length, int* v) {
+    glUniform1iv(GetUniformLocation(name), length, v);
 }
 
-void Shader::setUniform1f(const char* name, float v) {
-    glUniform1f(getUniformLocation(name), v);
+void Shader::SetUniform1f(const char* name, float v) {
+    glUniform1f(GetUniformLocation(name), v);
 }
 
-void Shader::setUniform4f(const char* name, float v0, float v1, float v2, float v3) {
-    glUniform4f(getUniformLocation(name), v0, v1, v2, v3);
+void Shader::SetUniform4f(const char* name, float v0, float v1, float v2, float v3) {
+    glUniform4f(GetUniformLocation(name), v0, v1, v2, v3);
 }
 
 void Shader::SetUniformMatrix4fv(const char* name, const glm::mat4& matrix) {
-    glUniformMatrix4fv(getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(matrix));
+    glUniformMatrix4fv(GetUniformLocation(name), 1, GL_FALSE, glm::value_ptr(matrix));
 }

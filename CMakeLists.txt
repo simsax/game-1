@@ -13,7 +13,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-
 configure_file(Config.h.in ${CMAKE_BINARY_DIR}/Config.h)
 
 # check the submodules
@@ -39,6 +38,8 @@ add_executable(${PROJECT_NAME}
     src/utils.cpp
     src/shader.cpp
     src/vao.cpp
+    src/render.cpp
+    src/texture.cpp
 )
 
 add_subdirectory(extern/glad)

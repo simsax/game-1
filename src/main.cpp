@@ -4,16 +4,14 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <glad/glad.h>
+#include "render.h"
 #include <SDL2/SDL.h>
 #include <array>
 #include "Config.h"
 #include "utils.h"
 #include "shader.h"
 #include "vao.h"
-// move this to texture class
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "texture.h"
 
 #ifndef NDEBUG
 #define DEBUG
@@ -24,7 +22,7 @@
 #define SCREEN_HEIGHT 1080
 #define ASPECT_RATIO ((float)SCREEN_WIDTH / (float)SCREEN_HEIGHT)
 
-#define ABS_PATH(x) (std::string(PROJECT_SOURCE_DIR) + (x))
+#define ABS_PATH(x) (PROJECT_SOURCE_DIR x)
 
 #define SDL_ERROR() fprintf(stderr, "SDL_Error: %s\n", SDL_GetError())
 #define BLACK 0,0,0
@@ -52,52 +50,6 @@ int tiles[5][5] = {
     { 1, 1, 1, 1, 1 },
 };
 
-void APIENTRY glDebugOutput(GLenum source, 
-                            GLenum type, 
-                            unsigned int id, 
-                            GLenum severity, 
-                            GLsizei length, 
-                            const char *message, 
-                            const void *userParam)
-{
-    // ignore non-significant error/warning codes
-    if(id == 131169 || id == 131185 || id == 131218 || id == 131204) return; 
-
-    std::cout << "---------------" << "/n";
-    std::cout << "Debug message (" << id << "): " <<  message << "/n";
-
-    switch (source)
-    {
-        case GL_DEBUG_SOURCE_API:             std::cout << "Source: API"; break;
-        case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   std::cout << "Source: Window System"; break;
-        case GL_DEBUG_SOURCE_SHADER_COMPILER: std::cout << "Source: Shader Compiler"; break;
-        case GL_DEBUG_SOURCE_THIRD_PARTY:     std::cout << "Source: Third Party"; break;
-        case GL_DEBUG_SOURCE_APPLICATION:     std::cout << "Source: Application"; break;
-        case GL_DEBUG_SOURCE_OTHER:           std::cout << "Source: Other"; break;
-    } std::cout << "/n";
-
-    switch (type)
-    {
-        case GL_DEBUG_TYPE_ERROR:               std::cout << "Type: Error"; break;
-        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: std::cout << "Type: Deprecated Behaviour"; break;
-        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  std::cout << "Type: Undefined Behaviour"; break; 
-        case GL_DEBUG_TYPE_PORTABILITY:         std::cout << "Type: Portability"; break;
-        case GL_DEBUG_TYPE_PERFORMANCE:         std::cout << "Type: Performance"; break;
-        case GL_DEBUG_TYPE_MARKER:              std::cout << "Type: Marker"; break;
-        case GL_DEBUG_TYPE_PUSH_GROUP:          std::cout << "Type: Push Group"; break;
-        case GL_DEBUG_TYPE_POP_GROUP:           std::cout << "Type: Pop Group"; break;
-        case GL_DEBUG_TYPE_OTHER:               std::cout << "Type: Other"; break;
-    } std::cout << "/n";
-    
-    switch (severity)
-    {
-        case GL_DEBUG_SEVERITY_HIGH:         std::cout << "Severity: high"; break;
-        case GL_DEBUG_SEVERITY_MEDIUM:       std::cout << "Severity: medium"; break;
-        case GL_DEBUG_SEVERITY_LOW:          std::cout << "Severity: low"; break;
-        case GL_DEBUG_SEVERITY_NOTIFICATION: std::cout << "Severity: notification"; break;
-    } std::cout << "/n";
-    std::cout << "/n";
-}
 
 int main() {
     // no error checking
@@ -127,7 +79,7 @@ int main() {
     // hide mouse and keep it inside the window
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
-    SDL_GLContext context = SDL_GL_CreateContext(window);
+    SDL_GLContext context = SDL(SDL_GL_CreateContext(window));
 
     gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress);
 
@@ -152,14 +104,11 @@ int main() {
 #endif
 
 
-    // for the grid, start at (0,0), iterate over every tile, keeping track of the last coordinate
-    // and generate a quad of size 1 in the XY plane (z = 0, cube will be translated up by model matrix)
     // each quad will have a margin (I think I can do this in the fragment shader).
     // the cube will have margins too
 
     // need to abstract rendering of basic shapes like a quad at coord x,y,z
     static constexpr int numTilesVertices = 25 * 4;
-    static constexpr int numTilesIndices = 25 * 6;
     std::vector<Vertex> tilesVertices;
     tilesVertices.reserve(numTilesVertices);
 
@@ -172,8 +121,6 @@ int main() {
         }
     }
 
-    static constexpr int numCubeVertices = 6 * 4;
-    static constexpr int numCubeIndices = 6 * 6;
     std::vector<Vertex> cubeVertices = {
         // front
         {glm::vec3(0.5f,   0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
@@ -212,27 +159,8 @@ int main() {
         {glm::vec3(0.5f, -0.5f,  0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
     };
 
-    std::vector<uint32_t> cubeIndices;
-    cubeIndices.reserve(numCubeIndices);
-    for (int i = 0; i < numCubeVertices; i += 4) {
-        cubeIndices.emplace_back(i + 0);
-        cubeIndices.emplace_back(i + 1);
-        cubeIndices.emplace_back(i + 3);
-        cubeIndices.emplace_back(i + 1);
-        cubeIndices.emplace_back(i + 2);
-        cubeIndices.emplace_back(i + 3);
-    }
-
-    std::vector<uint32_t> tilesIndices;
-    tilesIndices.reserve(numTilesIndices);
-    for (int i = 0; i < numTilesVertices; i += 4) {
-        tilesIndices.push_back(i + 0);
-        tilesIndices.push_back(i + 1);
-        tilesIndices.push_back(i + 3);
-        tilesIndices.push_back(i + 1);
-        tilesIndices.push_back(i + 2);
-        tilesIndices.push_back(i + 3);
-    }
+    std::vector<uint32_t> cubeIndices = generateQuadIndices(6);
+    std::vector<uint32_t> tilesIndices = generateQuadIndices(25);
 
     std::vector<Layout> cubeLayout = {
         { GL_FLOAT, 3 },
@@ -244,63 +172,15 @@ int main() {
     
     // compile and link shaders
     Shader shader = Shader(
-            ABS_PATH("/res/shaders/cubeShader.vert").c_str(),
-            ABS_PATH("/res/shaders/cubeShader.frag").c_str());
-    shader.bind();
+            ABS_PATH("/res/shaders/cubeShader.vert"),
+            ABS_PATH("/res/shaders/cubeShader.frag"));
+    shader.Bind();
 
-    // texture 1
-    uint32_t texture1;
-    glGenTextures(1, &texture1);
-    glBindTexture(GL_TEXTURE_2D, texture1);
-    // texture wrapping
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // texture filtering
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    Texture texture1 = Texture(ABS_PATH("/res/textures/container.jpg"), GL_RGB, GL_RGB);
+    Texture texture2 = Texture(ABS_PATH("/res/textures/awesomeface.png"), GL_RGB, GL_RGBA);
 
-    // load PNG image
-    int width, height, nrChannels;
-    std::string imagePath = ABS_PATH("/res/textures/container.jpg");
-	// flip texture upside down because for opengl bottom left is the starting position
-	stbi_set_flip_vertically_on_load(true);
-    uint8_t *data = stbi_load(imagePath.c_str(), &width, &height, &nrChannels, 0); 
-    if (data == nullptr) {
-        fprintf(stderr, "Failed at loading image: %s\n", imagePath.c_str());
-        exit(EXIT_FAILURE);
-    }
-    stbi_image_free(data);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    // texture 2
-    uint32_t texture2;
-    glGenTextures(1, &texture2);
-    glBindTexture(GL_TEXTURE_2D, texture2);
-    // texture wrapping
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // texture filtering
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // load second image
-    imagePath = ABS_PATH("/res/textures/awesomeface.png");
-    stbi_set_flip_vertically_on_load(true);
-    data = stbi_load(imagePath.c_str(), &width, &height, &nrChannels, 0);
-    if (data == nullptr) {
-        fprintf(stderr, "Failed at loading image: %s\n", imagePath.c_str());
-        exit(EXIT_FAILURE);
-    }
-    stbi_image_free(data);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    shader.bind();
-    shader.setUniform1i("texture1", 0);
-    shader.setUniform1i("texture2", 1);
+    shader.SetUniform1i("texture1", 0);
+    shader.SetUniform1i("texture2", 1);
 
     std::vector<Layout> tilesLayout = {
         { GL_FLOAT, 3 },
@@ -312,9 +192,9 @@ int main() {
 
     // compile and link shaders
     Shader shader2 = Shader(
-            ABS_PATH("/res/shaders/cubeShader.vert").c_str(),
-            ABS_PATH("/res/shaders/tileShader.frag").c_str());
-    shader2.bind();
+            ABS_PATH("/res/shaders/cubeShader.vert"),
+            ABS_PATH("/res/shaders/tileShader.frag"));
+    shader2.Bind();
 
     glEnable(GL_DEPTH_TEST);
 
@@ -483,13 +363,11 @@ int main() {
 
             /* float greenValue = sin(time) * 0.5 + 0.5; */
 
-            shader.bind();
+            shader.Bind();
             /* shader.setUniform4f("uColor", 0, greenValue, 0, 1); */
 
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, texture1);
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, texture2);
+            texture1.Bind(0);
+            texture2.Bind(1);
 
             // order of transformation is reversed (the last one is the first which is applied)
             glm::mat4 model = glm::mat4(1.0f);
@@ -510,12 +388,11 @@ int main() {
             shader.SetUniformMatrix4fv("view", view);
             shader.SetUniformMatrix4fv("projection", projection);
 
-            glBindVertexArray(cubeVao.getVaoId());
-            glDrawElements(GL_TRIANGLES, cubeVao.getCountIndices(), GL_UNSIGNED_INT, 0);
+            glBindVertexArray(cubeVao.GetVaoId());
+            glDrawElements(GL_TRIANGLES, cubeVao.GetCountIndices(), GL_UNSIGNED_INT, 0);
 
-            shader2.bind();
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, texture2);
+            shader2.Bind();
+            texture2.Bind(0);
             model = glm::mat4(1.0f);
             view = glm::mat4(1.0f);
             view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp); 
@@ -524,8 +401,8 @@ int main() {
             shader2.SetUniformMatrix4fv("view", view);
             shader2.SetUniformMatrix4fv("projection", projection);
 
-            glBindVertexArray(tilesVao.getVaoId());
-            glDrawElements(GL_TRIANGLES, tilesVao.getCountIndices(), GL_UNSIGNED_INT, 0);
+            glBindVertexArray(tilesVao.GetVaoId());
+            glDrawElements(GL_TRIANGLES, tilesVao.GetCountIndices(), GL_UNSIGNED_INT, 0);
         }
 
         SDL_GL_SwapWindow(window);

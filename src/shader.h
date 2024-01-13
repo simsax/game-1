@@ -13,13 +13,13 @@ class Shader
 {
 public:
     Shader(const char* vertexShaderPath, const char* fragmentShaderPath);
-    void bind();
-    void unbind();
-    GLint getUniformLocation(const char* name);
-	void setUniform1i(const char* name, int v);
-	void setUniform1iv(const char* name, int length, int* v);
-	void setUniform1f(const char* name, float v);
-	void setUniform4f(const char* name, float v0, float v1, float v2, float v3);
+    void Bind();
+    void Unbind();
+    GLint GetUniformLocation(const char* name);
+	void SetUniform1i(const char* name, int v);
+	void SetUniform1iv(const char* name, int length, int* v);
+	void SetUniform1f(const char* name, float v);
+	void SetUniform4f(const char* name, float v0, float v1, float v2, float v3);
     void SetUniformMatrix4fv(const char* name, const glm::mat4& matrix);
 
 private:
