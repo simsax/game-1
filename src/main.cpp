@@ -12,6 +12,7 @@
 #include "shader.h"
 #include "vao.h"
 #include "texture.h"
+#include <glm/gtx/string_cast.hpp>
 
 #ifndef NDEBUG
 #define DEBUG
@@ -26,6 +27,13 @@
 
 #define SDL_ERROR() fprintf(stderr, "SDL_Error: %s\n", SDL_GetError())
 #define BLACK 0,0,0
+
+enum class Rotation {
+    DOWN,
+    UP,
+    LEFT,
+    RIGHT
+};
 
 template <typename T>
 T* SDL(T* ptr) {
@@ -124,39 +132,39 @@ int main() {
     std::vector<Vertex> cubeVertices = {
         // front
         {glm::vec3(0.5f,   0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(0.5f,  -0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
-        {glm::vec3(-0.5f, -0.5f, 0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(-0.5f,  0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(0.5f,  -0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(-0.5f,  0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
 
         // back
-        {glm::vec3(0.5f,   0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(-0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
-        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f,   0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f,  0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
         {glm::vec3(0.5f,  -0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
 
         // down
-        {glm::vec3(0.5f,  -0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(0.5f,  -0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(0.5f,  -0.5f,  0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(0.5f,  -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
         {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(-0.5f, -0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(-0.5f, -0.5f,  0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
 
         // up
-        {glm::vec3(0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(-0.5f, 0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
-        {glm::vec3(-0.5f, 0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f, 0.5f,  0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(-0.5f, 0.5f, -0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
 
         // left
-        {glm::vec3(-0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(-0.5f,  -0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
-        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(-0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f,  -0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
         {glm::vec3(-0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
 
         // right
-        {glm::vec3(0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
-        {glm::vec3(0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(0.5f, -0.5f,  0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(0.5f,  0.5f,  0.5f),   glm::vec3(0.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f, -0.5f,  0.5f),   glm::vec3(0.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
     };
 
     std::vector<uint32_t> cubeIndices = generateQuadIndices(6);
@@ -180,7 +188,7 @@ int main() {
     Texture texture2 = Texture(ABS_PATH("/res/textures/awesomeface.png"), GL_RGB, GL_RGBA);
 
     shader.SetUniform1i("texture1", 0);
-    shader.SetUniform1i("texture2", 1);
+    /* shader.SetUniform1i("texture2", 1); */
 
     std::vector<Layout> tilesLayout = {
         { GL_FLOAT, 3 },
@@ -223,8 +231,20 @@ int main() {
     static constexpr float mouseSensitivity = 0.1f;
     static constexpr float defaultFov = 70.0f;
     float fov = defaultFov;
+    glm::vec3 pos = glm::vec3(0.0f);
+    glm::vec3 absPos = glm::vec3(0.0f);
+    glm::mat4 model = glm::mat4(1.0f);
+    glm::mat4 frozenModel = glm::mat4(1.0f);
+    bool rotating = false;
+    float angle = 0.0f;
+    glm::vec3 axis = glm::vec3(0);
+    glm::vec3 translationAxis = glm::vec3(0);
+    float curAngle = 0.0f;
+    float rotationSpeed = 10.0f;
+    float t = 0.0f;
+    Rotation rotation;
 
-    // handle input
+    // game loop
     while(!quit) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -234,53 +254,93 @@ int main() {
                     break;
                 case SDL_KEYDOWN:
                     switch (event.key.keysym.sym) {
-                    case SDLK_ESCAPE:
-                        quit = true;
-                        break;
-                    case SDLK_w:
-                        forward = true;
-                        break;
-                    case SDLK_a:
-                        left = true;
-                        break;
-                    case SDLK_s:
-                        backwards = true;
-                        break;
-                    case SDLK_d:
-                        right = true;
-                        break;
-                    case SDLK_SPACE:
-                        up = true;
-                        break;
-                    case SDLK_LCTRL:
-                        down = true;
-                        break;
-                    default:
-                        break;
+                        case SDLK_ESCAPE:
+                            quit = true;
+                            break;
+                        case SDLK_w:
+                            forward = true;
+                            break;
+                        case SDLK_a:
+                            left = true;
+                            break;
+                        case SDLK_s:
+                            backwards = true;
+                            break;
+                        case SDLK_d:
+                            right = true;
+                            break;
+                        case SDLK_SPACE:
+                            up = true;
+                            break;
+                        case SDLK_LCTRL:
+                            down = true;
+                            break;
+                        case SDLK_DOWN:
+                            if (!rotating) {
+                                axis = glm::vec3(1,0,0);
+                                angle = 90.0f;
+                                rotating = true;
+                                frozenModel = model;
+                                translationAxis = glm::vec3(0, 0.5, -0.5);
+                                rotation = Rotation::DOWN;
+                            }
+                            break;
+                        case SDLK_UP:
+                            if (!rotating) {
+                                axis = glm::vec3(1,0,0);
+                                angle = -90.0f;
+                                rotating = true;
+                                frozenModel = model;
+                                translationAxis = glm::vec3(0, 0.5, 0.5);
+                                rotation = Rotation::UP;
+                            }
+                            break;
+                        case SDLK_LEFT:
+                            if (!rotating) {
+                                axis = glm::vec3(0,0,1);
+                                angle = 90.0f;
+                                rotating = true;
+                                frozenModel = model;
+                                translationAxis = glm::vec3(0.5, 0.5, 0);
+                                rotation = Rotation::LEFT;
+                            }
+                            break;
+                        case SDLK_RIGHT:
+                            if (!rotating) {
+                                axis = glm::vec3(0,0,1);
+                                angle = -90.0f;
+                                rotating = true;
+                                frozenModel = model;
+                                translationAxis = glm::vec3(-0.5, 0.5, 0);
+                                rotation = Rotation::RIGHT;
+                            }
+                            break;
+                        default:
+                            break;
                     }
                     break;
                 case SDL_KEYUP:
                     switch (event.key.keysym.sym) {
-                    case SDLK_w:
-                        forward = false;
-                        break;
-                    case SDLK_a:
-                        left = false;
-                        break;
-                    case SDLK_s:
-                        backwards = false;
-                        break;
-                    case SDLK_d:
-                        right = false;
-                        break;
-                    case SDLK_SPACE:
-                        up = false;
-                        break;
-                    case SDLK_LCTRL:
-                        down = false;
-                        break;
-                    default:
-                        break;
+                        case SDLK_w:
+                            forward = false;
+                            break;
+                        case SDLK_a:
+                            left = false;
+                            break;
+                        case SDLK_s:
+                            backwards = false;
+                            break;
+                        case SDLK_d:
+                            right = false;
+                            break;
+                        case SDLK_SPACE:
+                            up = false;
+                            break;
+                        case SDLK_LCTRL:
+                            down = false;
+                            break;
+                        default:
+                            break;
                     }
                     break;
                 case SDL_MOUSEBUTTONDOWN:
@@ -369,21 +429,51 @@ int main() {
             texture1.Bind(0);
             texture2.Bind(1);
 
-            // order of transformation is reversed (the last one is the first which is applied)
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(0.5f, 0.5f, 0.5f));
-            /* model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f)); */ 
-            /* model = glm::rotate(model, time, glm::vec3(1.0f, 1.0f, 1.0f)); */
+            if (rotating) {
+                t += deltaTime * rotationSpeed; // make it a fixed update maybe
+                if (t >= 1.0f) {
+                    t = 1.0f;
+                    rotating = false;
+                }
+                curAngle = t * angle;
+                glm::mat4 trans = glm::translate(glm::mat4(1.0), - pos + translationAxis);
+                glm::mat4 transBack = glm::translate(glm::mat4(1.0), pos - translationAxis);
+                model = transBack * glm::rotate(glm::mat4(1.0), glm::radians(curAngle), axis) * trans * frozenModel;
+                if (!rotating) {
+                    curAngle = 0.0f;
+                    t = 0.0f;
+                    switch (rotation) {
+                        case Rotation::UP:
+                            pos.z -= 1;
+                            break;
+                        case Rotation::DOWN:
+                            pos.z += 1;
+                            break;
+                        case Rotation::LEFT:
+                            pos.x -= 1;
+                            break;
+                        case Rotation::RIGHT:
+                            pos.x += 1;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+
+            // now rotate about the other axis and add translation
 
             glm::mat4 view = glm::mat4(1.0f);
             // note that we're translating the scene in the reverse direction of where we want to move
             view = glm::translate(view, glm::vec3(0.0f, 0.0f, -2.0f)); 
             
+            // TODO: move out of the loop
             glm::mat4 projection = glm::perspective(glm::radians(fov), ASPECT_RATIO, 0.1f, 100.0f);
 
             view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp); 
 
             // TODO: figure out if better to compute mvp matrix on cpu vs doing it in vertex shader
+            // TODO: abstract camera out
             shader.SetUniformMatrix4fv("model", model);
             shader.SetUniformMatrix4fv("view", view);
             shader.SetUniformMatrix4fv("projection", projection);
@@ -393,16 +483,13 @@ int main() {
 
             shader2.Bind();
             texture2.Bind(0);
-            model = glm::mat4(1.0f);
-            view = glm::mat4(1.0f);
-            view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp); 
-
-            shader2.SetUniformMatrix4fv("model", model);
+            glm::mat4 model2 = glm::mat4(1.0f);
+            shader2.SetUniformMatrix4fv("model", model2);
             shader2.SetUniformMatrix4fv("view", view);
             shader2.SetUniformMatrix4fv("projection", projection);
 
             glBindVertexArray(tilesVao.GetVaoId());
-            glDrawElements(GL_TRIANGLES, tilesVao.GetCountIndices(), GL_UNSIGNED_INT, 0);
+            /* glDrawElements(GL_TRIANGLES, tilesVao.GetCountIndices(), GL_UNSIGNED_INT, 0); */
         }
 
         SDL_GL_SwapWindow(window);
