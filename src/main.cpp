@@ -35,9 +35,85 @@ enum class Rotation {
     RIGHT
 };
 
+enum class Orientation {
+    UP,
+    FRONT,
+    DOWN,
+    BACK,
+    LEFT,
+    RIGHT
+};
+
+enum class Face {
+    U, F, D, B, L, R
+};
+
+Face cubeState[] = { Face::U, Face::F, Face::D, Face::B, Face::L, Face::R };
+
+static void turn(Face* state, Rotation rotation) {
+    switch (rotation) {
+        case Rotation::DOWN:
+            {
+                Face temp = state[0];
+                state[0] = state[3];
+                state[3] = state[2];
+                state[2] = state[1];
+                state[1] = temp;
+            }
+            break;
+        case Rotation::UP:
+            {
+                Face temp = state[0];
+                state[0] = state[1];
+                state[1] = state[2];
+                state[2] = state[3];
+                state[3] = temp;
+            }
+            break;
+        case Rotation::LEFT:
+            {
+                Face temp = state[0];
+                state[0] = state[5];
+                state[5] = state[2];
+                state[2] = state[4];
+                state[4] = temp;
+            }
+            break;
+        case Rotation::RIGHT:
+            {
+                Face temp = state[0];
+                state[0] = state[4];
+                state[4] = state[2];
+                state[2] = state[5];
+                state[5] = temp;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+
+static const char* getFaceStr(Face face) {
+    switch (face) {
+        case Face::U:
+            return "U";
+        case Face::L:
+            return "L";
+        case Face::R:
+            return "R";
+        case Face::F:
+            return "F";
+        case Face::B:
+            return "B";
+        case Face::D:
+            return "D";
+    }
+}
+
 template <typename T>
 T* SDL(T* ptr) {
-    if (ptr == NULL) {
+    if (ptr == nullptr) {
         SDL_ERROR();
         exit(EXIT_FAILURE);
     }
@@ -50,14 +126,15 @@ struct Vertex {
     glm::vec2 texture;
 };
 
-int tiles[5][5] = {
-    { 1, 1, 1, 1, 1 },
-    { 1, 1, 1, 1, 1 },
-    { 1, 1, 1, 1, 1 },
-    { 1, 1, 1, 1, 1 },
-    { 1, 1, 1, 1, 1 },
-};
+struct Tile {
+    void SetColor(const glm::vec3& color) {
+        for (Vertex& vertex : tileVertices) {
+            vertex.color = color;
+        }
+    }
 
+    Vertex tileVertices[4]; // mesh
+};
 
 int main() {
     // no error checking
@@ -116,59 +193,63 @@ int main() {
     // the cube will have margins too
 
     // need to abstract rendering of basic shapes like a quad at coord x,y,z
-    static constexpr int numTilesVertices = 25 * 4;
-    std::vector<Vertex> tilesVertices;
-    tilesVertices.reserve(numTilesVertices);
+    static constexpr int sideLength = 5;
+    static constexpr int numTiles = sideLength * sideLength;
+    std::vector<Tile> tilesVector;
+    tilesVector.reserve(numTiles);
 
-    for (int i = 0; i < 5; i++) {
-        for (int j = 0; j < 5; j++) {
-            tilesVertices.emplace_back(glm::vec3(j,   0.0f, i),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 0.0f));
-            tilesVertices.emplace_back(glm::vec3(j + 1,   0.0f, i),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 0.0f));
-            tilesVertices.emplace_back(glm::vec3(j + 1,  0.0f, i + 1),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 1.0f));
-            tilesVertices.emplace_back(glm::vec3(j,  0.0f, i + 1),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 1.0f));
+    for (int i = 0; i < sideLength; i++) {
+        for (int j = 0; j < sideLength; j++) {
+            tilesVector.push_back({
+                Vertex{glm::vec3(j, 0.0f, i),         glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+                Vertex{glm::vec3(j + 1, 0.0f, i),     glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
+                Vertex{glm::vec3(j + 1, 0.0f, i + 1), glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
+                Vertex{glm::vec3(j, 0.0f, i + 1),     glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 1.0f)}
+            });
         }
     }
 
-    std::vector<Vertex> cubeVertices = {
-        // front
-        {glm::vec3(0.5f,   0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(0.5f,  -0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
-        {glm::vec3(-0.5f, -0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(-0.5f,  0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
 
-        // back
-        {glm::vec3(0.5f,   0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(-0.5f,  0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
-        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(0.5f,  -0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+    std::vector<Vertex> cubeVertices = {
+        // up
+        {glm::vec3(0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f, 0.5f,  0.5f),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(-0.5f, 0.5f, -0.5f),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
+
+        // front
+        {glm::vec3(0.5f,   0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(0.5f,  -0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(-0.5f,  0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
 
         // down
-        {glm::vec3(0.5f,  -0.5f,  0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(0.5f,  -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
-        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(-0.5f, -0.5f,  0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(0.5f,  -0.5f,  0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(0.5f,  -0.5f, -0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f,  0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
 
-        // up
-        {glm::vec3(0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(-0.5f, 0.5f,  0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
-        {glm::vec3(-0.5f, 0.5f, -0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        // back
+        {glm::vec3(0.5f,   0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f,  0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f,  -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
 
         // left
-        {glm::vec3(-0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(-0.5f,  -0.5f, 0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
-        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(-0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(-0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 0.5f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f,  -0.5f, 0.5f),   glm::vec3(1.0f, 0.5f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(1.0f, 0.5f, 0.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(-0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 0.5f, 0.0f),  glm::vec2(0.0f, 1.0f)},
 
         // right
-        {glm::vec3(0.5f,  0.5f,  0.5f),   glm::vec3(0.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
-        {glm::vec3(0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(0.5f, -0.5f,  0.5f),   glm::vec3(0.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(0.5f, -0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f, -0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
     };
 
     std::vector<uint32_t> cubeIndices = generateQuadIndices(6);
-    std::vector<uint32_t> tilesIndices = generateQuadIndices(25);
+    std::vector<uint32_t> tilesIndices = generateQuadIndices(numTiles);
 
     std::vector<Layout> cubeLayout = {
         { GL_FLOAT, 3 },
@@ -184,10 +265,10 @@ int main() {
             ABS_PATH("/res/shaders/cubeShader.frag"));
     shader.Bind();
 
-    Texture texture1 = Texture(ABS_PATH("/res/textures/container.jpg"), GL_RGB, GL_RGB);
-    Texture texture2 = Texture(ABS_PATH("/res/textures/awesomeface.png"), GL_RGB, GL_RGBA);
+    /* Texture texture1 = Texture(ABS_PATH("/res/textures/container.jpg"), GL_RGB, GL_RGB); */
+    /* Texture texture2 = Texture(ABS_PATH("/res/textures/awesomeface.png"), GL_RGB, GL_RGBA); */
 
-    shader.SetUniform1i("texture1", 0);
+    /* shader.SetUniform1i("texture1", 0); */
     /* shader.SetUniform1i("texture2", 1); */
 
     std::vector<Layout> tilesLayout = {
@@ -196,7 +277,8 @@ int main() {
         { GL_FLOAT, 2 }
     };
 
-    Vao tilesVao = Vao(tilesVertices, tilesIndices, tilesLayout, GL_STATIC_DRAW);
+    // TODO: dynamic or stream ?
+    Vao tilesVao = Vao(tilesVector, tilesIndices, tilesLayout, GL_DYNAMIC_DRAW);
 
     // compile and link shaders
     Shader shader2 = Shader(
@@ -223,18 +305,18 @@ int main() {
     glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f,  3.0f);
     glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
     glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
-    static constexpr float cameraSpeed = 5.0f;
+    static constexpr float cameraSpeed = 10.0f;
+    static constexpr float mouseSensitivity = 0.1f;
+    static constexpr float defaultFov = 70.0f;
     float yaw = -90.0f;
     float pitch = 0.0f;
     int xoffset = 0;
     int yoffset = 0;
-    static constexpr float mouseSensitivity = 0.1f;
-    static constexpr float defaultFov = 70.0f;
     float fov = defaultFov;
     glm::vec3 pos = glm::vec3(0.0f);
-    glm::vec3 absPos = glm::vec3(0.0f);
-    glm::mat4 model = glm::mat4(1.0f);
-    glm::mat4 frozenModel = glm::mat4(1.0f);
+    glm::vec3 absoluteTrans = glm::vec3(0.5f);
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), absoluteTrans);
+    glm::mat4 frozenModel = model;
     bool rotating = false;
     float angle = 0.0f;
     glm::vec3 axis = glm::vec3(0);
@@ -283,6 +365,7 @@ int main() {
                                 frozenModel = model;
                                 translationAxis = glm::vec3(0, 0.5, -0.5);
                                 rotation = Rotation::DOWN;
+                                turn(cubeState, rotation);
                             }
                             break;
                         case SDLK_UP:
@@ -293,6 +376,7 @@ int main() {
                                 frozenModel = model;
                                 translationAxis = glm::vec3(0, 0.5, 0.5);
                                 rotation = Rotation::UP;
+                                turn(cubeState, rotation);
                             }
                             break;
                         case SDLK_LEFT:
@@ -303,6 +387,7 @@ int main() {
                                 frozenModel = model;
                                 translationAxis = glm::vec3(0.5, 0.5, 0);
                                 rotation = Rotation::LEFT;
+                                turn(cubeState, rotation);
                             }
                             break;
                         case SDLK_RIGHT:
@@ -313,6 +398,7 @@ int main() {
                                 frozenModel = model;
                                 translationAxis = glm::vec3(-0.5, 0.5, 0);
                                 rotation = Rotation::RIGHT;
+                                turn(cubeState, rotation);
                             }
                             break;
                         default:
@@ -401,16 +487,15 @@ int main() {
         deltaTime = time - lastFrame;
         lastFrame = time;
         float cameraOffset = cameraSpeed * deltaTime;
-        glm::vec3 yMasked = glm::vec3(1.0f, 0.0f, 1.0f);
 
         if (forward)
-            cameraPos += yMasked * cameraOffset * cameraFront;
+            cameraPos += cameraOffset * glm::normalize(glm::vec3(cameraFront.x, 0, cameraFront.z));
         if (backwards)
-            cameraPos -= yMasked * cameraOffset * cameraFront;
+            cameraPos -= cameraOffset * glm::normalize(glm::vec3(cameraFront.x, 0, cameraFront.z));
         if (left)
-            cameraPos -= yMasked * cameraOffset * glm::normalize(glm::cross(cameraFront, cameraUp));
+            cameraPos -= cameraOffset * glm::normalize(glm::cross(cameraFront, cameraUp));
         if (right)
-            cameraPos += yMasked * cameraOffset * glm::normalize(glm::cross(cameraFront, cameraUp));
+            cameraPos += cameraOffset * glm::normalize(glm::cross(cameraFront, cameraUp));
         if (up)
             cameraPos.y += cameraOffset;
         if (down)
@@ -421,14 +506,6 @@ int main() {
             glClearColor(BLACK, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            /* float greenValue = sin(time) * 0.5 + 0.5; */
-
-            shader.Bind();
-            /* shader.setUniform4f("uColor", 0, greenValue, 0, 1); */
-
-            texture1.Bind(0);
-            texture2.Bind(1);
-
             if (rotating) {
                 t += deltaTime * rotationSpeed; // make it a fixed update maybe
                 if (t >= 1.0f) {
@@ -436,12 +513,13 @@ int main() {
                     rotating = false;
                 }
                 curAngle = t * angle;
-                glm::mat4 trans = glm::translate(glm::mat4(1.0), - pos + translationAxis);
-                glm::mat4 transBack = glm::translate(glm::mat4(1.0), pos - translationAxis);
+                glm::mat4 trans = glm::translate(glm::mat4(1.0), - absoluteTrans - pos + translationAxis);
+                glm::mat4 transBack = glm::translate(glm::mat4(1.0), absoluteTrans + pos - translationAxis);
                 model = transBack * glm::rotate(glm::mat4(1.0), glm::radians(curAngle), axis) * trans * frozenModel;
                 if (!rotating) {
                     curAngle = 0.0f;
                     t = 0.0f;
+                    // update the position only after the rotation has finished
                     switch (rotation) {
                         case Rotation::UP:
                             pos.z -= 1;
@@ -458,10 +536,19 @@ int main() {
                         default:
                             break;
                     }
+                    Face downFace = cubeState[(int)Orientation::DOWN];
+                    if (downFace == Face::R) {
+                        int tileIx = pos.z * sideLength + pos.x;
+                        if (pos.x >= 0 && pos.z >= 0 && pos.x < sideLength && pos.z < sideLength) {
+                            tilesVector[tileIx].SetColor({1, 0, 0});
+                            glBindVertexArray(tilesVao.GetVaoId());
+                            glBufferSubData(GL_ARRAY_BUFFER, tileIx * sizeof(Tile), sizeof(Tile), &tilesVector[tileIx]);
+                            printf("Red face is down, replacing tile at index: %d\n", tileIx);
+                        }
+                    }
                 }
             }
 
-            // now rotate about the other axis and add translation
 
             glm::mat4 view = glm::mat4(1.0f);
             // note that we're translating the scene in the reverse direction of where we want to move
@@ -472,6 +559,8 @@ int main() {
 
             view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp); 
 
+            shader.Bind();
+            /* texture1.Bind(0); */
             // TODO: figure out if better to compute mvp matrix on cpu vs doing it in vertex shader
             // TODO: abstract camera out
             shader.SetUniformMatrix4fv("model", model);
@@ -482,14 +571,13 @@ int main() {
             glDrawElements(GL_TRIANGLES, cubeVao.GetCountIndices(), GL_UNSIGNED_INT, 0);
 
             shader2.Bind();
-            texture2.Bind(0);
             glm::mat4 model2 = glm::mat4(1.0f);
             shader2.SetUniformMatrix4fv("model", model2);
             shader2.SetUniformMatrix4fv("view", view);
             shader2.SetUniformMatrix4fv("projection", projection);
 
             glBindVertexArray(tilesVao.GetVaoId());
-            /* glDrawElements(GL_TRIANGLES, tilesVao.GetCountIndices(), GL_UNSIGNED_INT, 0); */
+            glDrawElements(GL_TRIANGLES, tilesVao.GetCountIndices(), GL_UNSIGNED_INT, 0);
         }
 
         SDL_GL_SwapWindow(window);

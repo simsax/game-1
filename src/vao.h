@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstddef>
 #include <cstdio>
+#include <iostream>
 
 struct Layout {
     GLenum type;
@@ -16,10 +17,11 @@ uint32_t getSizeOfType(GLenum type);
 class Vao {
 public:
     // TODO: figure out if I should switch to arrays (profile)
+    // do NOT assume that T is the type that represent a vertex, it could contain more vertices
     template <typename T>
     inline Vao(const std::vector<T>& vertices, const std::vector<uint32_t>& indices,
             const std::vector<Layout>& layouts, GLenum usage):
-        m_Vao(0), m_Vbo(0), m_Ebo(0), m_Stride(sizeof(T)), m_IndicesCount(indices.size())
+        m_Vao(0), m_Vbo(0), m_Ebo(0), m_Stride(0), m_IndicesCount(indices.size())
     {
         // create vao
         glGenVertexArrays(1, &m_Vao);
@@ -35,6 +37,13 @@ public:
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Ebo);
         // TODO: figure out if dynamic/static/stream
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(T), indices.data(), GL_STATIC_DRAW);
+
+        // calculate stride
+        for (size_t i = 0; i < layouts.size(); i++) {
+            GLenum type = layouts[i].type;
+            GLint count = layouts[i].count;
+            m_Stride += count * getSizeOfType(type);
+        }
 
         // specify vertex attributes
         uint64_t offset = 0;

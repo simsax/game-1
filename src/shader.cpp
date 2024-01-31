@@ -61,7 +61,7 @@ GLint Shader::GetUniformLocation(const char* name)
 
 	GLint location = glGetUniformLocation(m_ProgramId, name);
 	if (location == -1) {
-		fprintf(stderr, "Uniform '%s' location not found.\n", name);
+		fprintf(stderr, "ERROR: Uniform '%s' location not found.\n", name);
         exit(EXIT_FAILURE);
     }
 	m_UniformLocationCache[name] = location;
@@ -79,6 +79,16 @@ void Shader::SetUniform1iv(const char* name, int length, int* v) {
 void Shader::SetUniform1f(const char* name, float v) {
     glUniform1f(GetUniformLocation(name), v);
 }
+
+
+void Shader::SetUniform2f(const char* name, float v0, float v1) {
+    glUniform2f(GetUniformLocation(name), v0, v1);
+}
+
+void Shader::SetUniform3f(const char* name, float v0, float v1, float v2) {
+    glUniform3f(GetUniformLocation(name), v0, v1, v2);
+}
+
 
 void Shader::SetUniform4f(const char* name, float v0, float v1, float v2, float v3) {
     glUniform4f(GetUniformLocation(name), v0, v1, v2, v3);
