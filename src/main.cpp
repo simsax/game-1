@@ -2,17 +2,16 @@
 #include <SDL_mouse.h>
 #include <SDL_stdinc.h>
 #include <cstdlib>
-#include <fstream>
 #include <iostream>
-#include "render.h"
 #include <SDL2/SDL.h>
-#include <array>
+#include <glm/gtx/string_cast.hpp>
+#include "render.h"
 #include "Config.h"
 #include "utils.h"
 #include "shader.h"
 #include "vao.h"
-#include "texture.h"
-#include <glm/gtx/string_cast.hpp>
+#include "camera.h"
+
 
 #ifndef NDEBUG
 #define DEBUG
@@ -162,7 +161,9 @@ int main() {
     ));
 
     // hide mouse and keep it inside the window
+#if !ORTHO
     SDL_SetRelativeMouseMode(SDL_TRUE);
+#endif
 
     SDL_GLContext context = SDL(SDL_GL_CreateContext(window));
 
@@ -193,7 +194,7 @@ int main() {
     // the cube will have margins too
 
     // need to abstract rendering of basic shapes like a quad at coord x,y,z
-    static constexpr int sideLength = 5;
+    static constexpr int sideLength = 3;
     static constexpr int numTiles = sideLength * sideLength;
     std::vector<Tile> tilesVector;
     tilesVector.reserve(numTiles);
@@ -212,40 +213,40 @@ int main() {
 
     std::vector<Vertex> cubeVertices = {
         // up
-        {glm::vec3(0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(-0.5f, 0.5f,  0.5f),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
-        {glm::vec3(-0.5f, 0.5f, -0.5f),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(0.5f,  0.5f,  0.5f),  glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f, 0.5f,  0.5f),  glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(-0.5f, 0.5f, -0.5f),  glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f,  0.5f, -0.5f),  glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 0.0f)},
 
         // front
-        {glm::vec3(0.5f,   0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(0.5f,  -0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
-        {glm::vec3(-0.5f, -0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(-0.5f,  0.5f, 0.5f),   glm::vec3(0.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(0.5f,   0.5f, 0.5f),  glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(0.5f,  -0.5f, 0.5f),  glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f, 0.5f),  glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(-0.5f,  0.5f, 0.5f),  glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
 
         // down
-        {glm::vec3(0.5f,  -0.5f,  0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(0.5f,  -0.5f, -0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
-        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(-0.5f, -0.5f,  0.5f),   glm::vec3(1.0f, 1.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(0.5f,  -0.5f,  0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(0.5f,  -0.5f, -0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f,  0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 1.0f)},
 
         // back
-        {glm::vec3(0.5f,   0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(-0.5f,  0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 1.0f)},
-        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(0.5f,  -0.5f, -0.5f),   glm::vec3(0.0f, 0.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(0.5f,   0.5f, -0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f,  0.5f, -0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f,  -0.5f, -0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 0.0f)},
 
         // left
-        {glm::vec3(-0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 0.5f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(-0.5f,  -0.5f, 0.5f),   glm::vec3(1.0f, 0.5f, 0.0f),  glm::vec2(1.0f, 0.0f)},
-        {glm::vec3(-0.5f, -0.5f, -0.5f),   glm::vec3(1.0f, 0.5f, 0.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(-0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 0.5f, 0.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(-0.5f,  0.5f,  0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f,  -0.5f, 0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(-0.5f,  0.5f, -0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 1.0f)},
 
         // right
-        {glm::vec3(0.5f,  0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(0.5f,  0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
-        {glm::vec3(0.5f, -0.5f, -0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(0.5f, -0.5f,  0.5f),   glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(0.5f,  0.5f,  0.5f),  glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(0.5f,  0.5f, -0.5f),  glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(0.5f, -0.5f, -0.5f),  glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f, -0.5f,  0.5f),  glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 0.0f)},
     };
 
     std::vector<uint32_t> cubeIndices = generateQuadIndices(6);
@@ -264,12 +265,6 @@ int main() {
             ABS_PATH("/res/shaders/cubeShader.vert"),
             ABS_PATH("/res/shaders/cubeShader.frag"));
     shader.Bind();
-
-    /* Texture texture1 = Texture(ABS_PATH("/res/textures/container.jpg"), GL_RGB, GL_RGB); */
-    /* Texture texture2 = Texture(ABS_PATH("/res/textures/awesomeface.png"), GL_RGB, GL_RGBA); */
-
-    /* shader.SetUniform1i("texture1", 0); */
-    /* shader.SetUniform1i("texture2", 1); */
 
     std::vector<Layout> tilesLayout = {
         { GL_FLOAT, 3 },
@@ -290,29 +285,26 @@ int main() {
 
     // some globals (outside the game loop)
     bool quit = false;
-
-    bool forward = false;
-    bool backwards = false;
-    bool left = false;
-    bool right = false;
-    bool up = false;
-    bool down = false;
-
     float deltaTime = 0.0f; // time between current and last frame
     float lastFrame = 0.0f; // time of last frame
 
     // camera
-    glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f,  3.0f);
-    glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-    glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
+    glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f,  0.0f);
     static constexpr float cameraSpeed = 10.0f;
     static constexpr float mouseSensitivity = 0.1f;
-    static constexpr float defaultFov = 70.0f;
-    float yaw = -90.0f;
-    float pitch = 0.0f;
-    int xoffset = 0;
-    int yoffset = 0;
-    float fov = defaultFov;
+    static constexpr float fov = 70.0f;
+#if ORTHO
+    glm::vec3 cameraPos   = glm::vec3(-6.0f, 15.0f,  18.0f);
+    glm::vec3 cameraFront = glm::vec3(0.32f, -0.63f, -0.7f);
+    static constexpr float len = 6.0f;
+    glm::mat4 projection = glm::ortho(-ASPECT_RATIO*len/2, ASPECT_RATIO*len/2, -len/2, len/2, 0.1f, 1000.0f);
+#else
+    glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f,  3.0f);
+    glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(fov), ASPECT_RATIO, 0.1f, 100.0f);
+#endif
+    Camera flyCam = Camera(projection, cameraPos, cameraFront, cameraUp, cameraSpeed, fov, mouseSensitivity);
+
     glm::vec3 pos = glm::vec3(0.0f);
     glm::vec3 absoluteTrans = glm::vec3(0.5f);
     glm::mat4 model = glm::translate(glm::mat4(1.0f), absoluteTrans);
@@ -340,22 +332,22 @@ int main() {
                             quit = true;
                             break;
                         case SDLK_w:
-                            forward = true;
+                            flyCam.Move(Direction::FORWARD);
                             break;
                         case SDLK_a:
-                            left = true;
+                            flyCam.Move(Direction::LEFT);
                             break;
                         case SDLK_s:
-                            backwards = true;
+                            flyCam.Move(Direction::BACKWARDS);
                             break;
                         case SDLK_d:
-                            right = true;
+                            flyCam.Move(Direction::RIGHT);
                             break;
                         case SDLK_SPACE:
-                            up = true;
+                            flyCam.Move(Direction::UP);
                             break;
                         case SDLK_LCTRL:
-                            down = true;
+                            flyCam.Move(Direction::DOWN);
                             break;
                         case SDLK_DOWN:
                             if (!rotating) {
@@ -408,22 +400,22 @@ int main() {
                 case SDL_KEYUP:
                     switch (event.key.keysym.sym) {
                         case SDLK_w:
-                            forward = false;
+                            flyCam.Stop(Direction::FORWARD);
                             break;
                         case SDLK_a:
-                            left = false;
+                            flyCam.Stop(Direction::LEFT);
                             break;
                         case SDLK_s:
-                            backwards = false;
+                            flyCam.Stop(Direction::BACKWARDS);
                             break;
                         case SDLK_d:
-                            right = false;
+                            flyCam.Stop(Direction::RIGHT);
                             break;
                         case SDLK_SPACE:
-                            up = false;
+                            flyCam.Stop(Direction::UP);
                             break;
                         case SDLK_LCTRL:
-                            down = false;
+                            flyCam.Stop(Direction::DOWN);
                             break;
                         default:
                             break;
@@ -448,34 +440,14 @@ int main() {
                 case SDL_MOUSEMOTION:
                     {
                         // retrieve x and y offset from mouse movement
-                        xoffset = event.motion.xrel;
-                        yoffset = - event.motion.yrel; // down is 1 for SDL but -1 for OpenGL coords
-                        yaw = glm::mod(yaw + xoffset * mouseSensitivity, 360.0f);
-                        pitch += yoffset * mouseSensitivity;
-
-                        // constrain pitch to avoid weird camera movements
-                        if (pitch > 89.0f)
-                            pitch = 89.0f;
-                        if (pitch < -89.0f)
-                            pitch = -89.0f;
-
-                        // calculate camera direction
-                        glm::vec3 direction;
-                        direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-                        direction.y = sin(glm::radians(pitch));
-                        direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-                        cameraFront = glm::normalize(direction);
+                        int xoffset = event.motion.xrel;
+                        int yoffset = -event.motion.yrel; // down is 1 for SDL but -1 for OpenGL coords
+                        flyCam.Turn(xoffset, yoffset);
                     }
                     break;
                 case SDL_MOUSEWHEEL:
                     {
-                        fov -= event.wheel.y;
-
-                        // constain fov
-                        if (fov < 1.0f)
-                            fov = 1.0f;
-                        if (fov > defaultFov)
-                            fov = defaultFov;
+                        flyCam.Zoom(-event.wheel.y);
                     }
                 default:
                     break;
@@ -486,20 +458,7 @@ int main() {
         float time = SDL_GetTicks() / 1000.0f;
         deltaTime = time - lastFrame;
         lastFrame = time;
-        float cameraOffset = cameraSpeed * deltaTime;
-
-        if (forward)
-            cameraPos += cameraOffset * glm::normalize(glm::vec3(cameraFront.x, 0, cameraFront.z));
-        if (backwards)
-            cameraPos -= cameraOffset * glm::normalize(glm::vec3(cameraFront.x, 0, cameraFront.z));
-        if (left)
-            cameraPos -= cameraOffset * glm::normalize(glm::cross(cameraFront, cameraUp));
-        if (right)
-            cameraPos += cameraOffset * glm::normalize(glm::cross(cameraFront, cameraUp));
-        if (up)
-            cameraPos.y += cameraOffset;
-        if (down)
-            cameraPos.y -= cameraOffset;
+        flyCam.Update(deltaTime);
 
         // render
         {
@@ -537,7 +496,7 @@ int main() {
                             break;
                     }
                     Face downFace = cubeState[(int)Orientation::DOWN];
-                    if (downFace == Face::R) {
+                    if (downFace == Face::F) {
                         int tileIx = pos.z * sideLength + pos.x;
                         if (pos.x >= 0 && pos.z >= 0 && pos.x < sideLength && pos.z < sideLength) {
                             tilesVector[tileIx].SetColor({1, 0, 0});
@@ -553,11 +512,7 @@ int main() {
             glm::mat4 view = glm::mat4(1.0f);
             // note that we're translating the scene in the reverse direction of where we want to move
             view = glm::translate(view, glm::vec3(0.0f, 0.0f, -2.0f)); 
-            
-            // TODO: move out of the loop
-            glm::mat4 projection = glm::perspective(glm::radians(fov), ASPECT_RATIO, 0.1f, 100.0f);
-
-            view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp); 
+            view = glm::lookAt(flyCam.GetPos(), flyCam.GetPos() + flyCam.GetFront(), flyCam.GetUp()); 
 
             shader.Bind();
             /* texture1.Bind(0); */
@@ -565,7 +520,7 @@ int main() {
             // TODO: abstract camera out
             shader.SetUniformMatrix4fv("model", model);
             shader.SetUniformMatrix4fv("view", view);
-            shader.SetUniformMatrix4fv("projection", projection);
+            shader.SetUniformMatrix4fv("projection", flyCam.GetProjection());
 
             glBindVertexArray(cubeVao.GetVaoId());
             glDrawElements(GL_TRIANGLES, cubeVao.GetCountIndices(), GL_UNSIGNED_INT, 0);
@@ -574,7 +529,7 @@ int main() {
             glm::mat4 model2 = glm::mat4(1.0f);
             shader2.SetUniformMatrix4fv("model", model2);
             shader2.SetUniformMatrix4fv("view", view);
-            shader2.SetUniformMatrix4fv("projection", projection);
+            shader2.SetUniformMatrix4fv("projection", flyCam.GetProjection());
 
             glBindVertexArray(tilesVao.GetVaoId());
             glDrawElements(GL_TRIANGLES, tilesVao.GetCountIndices(), GL_UNSIGNED_INT, 0);
@@ -588,3 +543,4 @@ int main() {
     SDL_DestroyWindow(window);
     SDL_Quit();
 }
+
