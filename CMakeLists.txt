@@ -40,7 +40,6 @@ add_executable(${PROJECT_NAME}
     src/vao.cpp
     src/render.cpp
     src/texture.cpp
-    src/camera.cpp
 )
 
 add_subdirectory(extern/glad)

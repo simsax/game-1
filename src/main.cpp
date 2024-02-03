@@ -12,6 +12,7 @@
 #include "vao.h"
 #include "camera.h"
 
+#define ORTHO 1
 
 #ifndef NDEBUG
 #define DEBUG
@@ -289,21 +290,25 @@ int main() {
     float lastFrame = 0.0f; // time of last frame
 
     // camera
-    glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f,  0.0f);
-    static constexpr float cameraSpeed = 10.0f;
-    static constexpr float mouseSensitivity = 0.1f;
-    static constexpr float fov = 70.0f;
 #if ORTHO
-    glm::vec3 cameraPos   = glm::vec3(-6.0f, 15.0f,  18.0f);
-    glm::vec3 cameraFront = glm::vec3(0.32f, -0.63f, -0.7f);
-    static constexpr float len = 6.0f;
-    glm::mat4 projection = glm::ortho(-ASPECT_RATIO*len/2, ASPECT_RATIO*len/2, -len/2, len/2, 0.1f, 1000.0f);
+    auto flyCam = Camera<CameraType::ORTHOGRAPHIC>(
+            ASPECT_RATIO, 0.1f, 100.0f,
+            glm::vec3(-6.0f, 15.0f,  18.0f),
+            glm::vec3(0.32f, -0.63f, -0.7f),
+            glm::vec3(0.0f, 1.0f, 0.0f),
+            10.0f,
+            70.0f,
+            0.1f);
 #else
-    glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f,  3.0f);
-    glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-    glm::mat4 projection = glm::perspective(glm::radians(fov), ASPECT_RATIO, 0.1f, 100.0f);
+    auto flyCam = Camera<CameraType::PERSPECTIVE>(
+            ASPECT_RATIO, 0.1f, 100.0f,
+            glm::vec3(0.0f, 0.0f,  3.0f),
+            glm::vec3(0.0f, 0.0f, -1.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f),
+            10.0f,
+            70.0f,
+            0.1f);
 #endif
-    Camera flyCam = Camera(projection, cameraPos, cameraFront, cameraUp, cameraSpeed, fov, mouseSensitivity);
 
     glm::vec3 pos = glm::vec3(0.0f);
     glm::vec3 absoluteTrans = glm::vec3(0.5f);
