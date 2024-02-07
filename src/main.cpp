@@ -9,10 +9,11 @@
 #include "Config.h"
 #include "utils.h"
 #include "shader.h"
-#include "vao.h"
+#include "mesh.h"
 #include "camera.h"
 
 #define ORTHO 1
+#define WIREFRAME 0
 
 #ifndef NDEBUG
 #define DEBUG
@@ -123,7 +124,7 @@ T* SDL(T* ptr) {
 struct Vertex {
     glm::vec3 position;
     glm::vec3 color;
-    glm::vec2 texture;
+    glm::vec2 texture; // Probably I can cut this
 };
 
 struct Tile {
@@ -133,9 +134,16 @@ struct Tile {
         }
     }
 
-    Vertex tileVertices[4]; // mesh
+    static constexpr int numVertices = 4;
+    Vertex tileVertices[numVertices]; // mesh
 };
 
+struct EditorTile {
+    static constexpr int numVertices = 4;
+    glm::vec3 tileVertices[numVertices]; // mesh
+};
+
+// TODO: face culling
 int main() {
     // no error checking
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -148,6 +156,9 @@ int main() {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    // set multi sampling antialiasing (MSAA)
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 #ifdef DEBUG
     printf("DEBUG ON\n");
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
@@ -177,40 +188,20 @@ int main() {
     if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
     {
         // initialize debug output 
-        printf("Debug output is on\n");
         glEnable(GL_DEBUG_OUTPUT);
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS); 
         glDebugMessageCallback(glDebugOutput, nullptr);
         glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
-        // errors only
-        /* glDebugMessageControl(GL_DEBUG_SOURCE_API, */ 
-        /*                       GL_DEBUG_TYPE_ERROR, */ 
-        /*                       GL_DEBUG_SEVERITY_HIGH, */
-        /*                       0, nullptr, GL_TRUE); */ 
     }
 #endif
 
-
-    // each quad will have a margin (I think I can do this in the fragment shader).
-    // the cube will have margins too
-
-    // need to abstract rendering of basic shapes like a quad at coord x,y,z
-    static constexpr int sideLength = 3;
-    static constexpr int numTiles = sideLength * sideLength;
-    std::vector<Tile> tilesVector;
-    tilesVector.reserve(numTiles);
-
-    for (int i = 0; i < sideLength; i++) {
-        for (int j = 0; j < sideLength; j++) {
-            tilesVector.push_back({
-                Vertex{glm::vec3(j, 0.0f, i),         glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
-                Vertex{glm::vec3(j + 1, 0.0f, i),     glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
-                Vertex{glm::vec3(j + 1, 0.0f, i + 1), glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
-                Vertex{glm::vec3(j, 0.0f, i + 1),     glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 1.0f)}
-            });
-        }
-    }
-
+#if WIREFRAME
+    glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+#endif
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_MULTISAMPLE); 
+	glEnable(GL_LINE_SMOOTH);
+	glLineWidth(2);
 
     std::vector<Vertex> cubeVertices = {
         // up
@@ -250,8 +241,43 @@ int main() {
         {glm::vec3(0.5f, -0.5f,  0.5f),  glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 0.0f)},
     };
 
+
+    static constexpr int sideNum = 3;
+    static constexpr int numTiles = sideNum * sideNum;
+    std::vector<Tile> tilesVector;
+    tilesVector.reserve(numTiles);
+
+    for (int z = 0; z < sideNum; z++) {
+        for (int x = 0; x < sideNum; x++) {
+            tilesVector.push_back({
+                Vertex{glm::vec3(x, 0.0f, z),         glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
+                Vertex{glm::vec3(x + 1, 0.0f, z),     glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
+                Vertex{glm::vec3(x + 1, 0.0f, z + 1), glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
+                Vertex{glm::vec3(x, 0.0f, z + 1),     glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 1.0f)}
+            });
+        }
+    }
+
+    static constexpr int sideNumEditor = 100;
+    static constexpr int numTilesEditor = sideNumEditor * sideNumEditor;
+    std::vector<EditorTile> editorTilesVector;
+    editorTilesVector.reserve(numTilesEditor);
+
+    int offset = sideNumEditor / 2;
+    for (int z = 0; z < sideNumEditor; z++) {
+        for (int x = 0; x < sideNumEditor; x++) {
+            editorTilesVector.push_back({
+                    glm::vec3(x - offset, 0.0f, z - offset),
+                    glm::vec3(x + 1 - offset, 0.0f, z - offset),
+                    glm::vec3(x + 1 - offset, 0.0f, z + 1 - offset),
+                    glm::vec3(x - offset, 0.0f, z + 1 - offset)
+            });
+        }
+    }
+
     std::vector<uint32_t> cubeIndices = generateQuadIndices(6);
     std::vector<uint32_t> tilesIndices = generateQuadIndices(numTiles);
+    std::vector<uint32_t> editorTilesIndices = generateQuadLineIndices(numTilesEditor);
 
     std::vector<Layout> cubeLayout = {
         { GL_FLOAT, 3 },
@@ -259,30 +285,68 @@ int main() {
         { GL_FLOAT, 2 }
     };
 
-    Vao cubeVao = Vao(cubeVertices, cubeIndices, cubeLayout, GL_STATIC_DRAW);
-    
-    // compile and link shaders
-    Shader shader = Shader(
-            ABS_PATH("/res/shaders/cubeShader.vert"),
-            ABS_PATH("/res/shaders/cubeShader.frag"));
-    shader.Bind();
-
     std::vector<Layout> tilesLayout = {
         { GL_FLOAT, 3 },
         { GL_FLOAT, 3 },
         { GL_FLOAT, 2 }
     };
 
-    // TODO: dynamic or stream ?
-    Vao tilesVao = Vao(tilesVector, tilesIndices, tilesLayout, GL_DYNAMIC_DRAW);
+    std::vector<Layout> editorTilesLayout = {
+        { GL_FLOAT, 3 }
+    };
+
+    Mesh cubeMesh = Mesh(
+            cubeVertices.data(),
+            cubeVertices.size(),
+            cubeVertices.size() * sizeof(Vertex),
+            cubeLayout,
+            GL_STATIC_DRAW,
+            cubeIndices.data(),
+            cubeIndices.size(),
+            cubeIndices.size() * sizeof(uint32_t));
+    
+    // TODO: dynamic or stream?
+    Mesh tilesMesh = Mesh(
+            tilesVector.data(),
+            tilesVector.size() * Tile::numVertices,
+            tilesVector.size() * sizeof(Tile),
+            tilesLayout,
+            GL_DYNAMIC_DRAW,
+            tilesIndices.data(),
+            tilesIndices.size(),
+            tilesIndices.size() * sizeof(uint32_t));
+
+
+    // use this for the raycasted tile
+    /* Mesh editorTilesMesh = Mesh( */
+    /*         editorTilesVector.data(), */
+    /*         editorTilesVector.size(), */
+    /*         editorTilesVector.size() * sizeof(EditorTile), */
+    /*         tilesLayout, */
+    /*         GL_STATIC_DRAW); */
+
+    Mesh editorTilesMesh = Mesh(
+            editorTilesVector.data(),
+            editorTilesVector.size() * EditorTile::numVertices,
+            editorTilesVector.size() * sizeof(EditorTile),
+            editorTilesLayout,
+            GL_STATIC_DRAW,
+            editorTilesIndices.data(),
+            editorTilesIndices.size(),
+            editorTilesIndices.size() * sizeof(uint32_t));
 
     // compile and link shaders
-    Shader shader2 = Shader(
+    Shader cubeShader = Shader(
+            ABS_PATH("/res/shaders/cubeShader.vert"),
+            ABS_PATH("/res/shaders/cubeShader.frag"));
+
+    Shader tilesShader = Shader(
             ABS_PATH("/res/shaders/cubeShader.vert"),
             ABS_PATH("/res/shaders/tileShader.frag"));
-    shader2.Bind();
 
-    glEnable(GL_DEPTH_TEST);
+    Shader editorTilesShader = Shader(
+            ABS_PATH("/res/shaders/editorTileShader.vert"),
+            ABS_PATH("/res/shaders/editorTileShader.frag"));
 
     // some globals (outside the game loop)
     bool quit = false;
@@ -502,11 +566,10 @@ int main() {
                     }
                     Face downFace = cubeState[(int)Orientation::DOWN];
                     if (downFace == Face::F) {
-                        int tileIx = pos.z * sideLength + pos.x;
-                        if (pos.x >= 0 && pos.z >= 0 && pos.x < sideLength && pos.z < sideLength) {
+                        int tileIx = pos.z * sideNum + pos.x;
+                        if (pos.x >= 0 && pos.z >= 0 && pos.x < sideNum && pos.z < sideNum) {
                             tilesVector[tileIx].SetColor({1, 0, 0});
-                            glBindVertexArray(tilesVao.GetVaoId());
-                            glBufferSubData(GL_ARRAY_BUFFER, tileIx * sizeof(Tile), sizeof(Tile), &tilesVector[tileIx]);
+                            tilesMesh.UpdateBufferData(tileIx * sizeof(Tile), sizeof(Tile), &tilesVector[tileIx]);
                             printf("Red face is down, replacing tile at index: %d\n", tileIx);
                         }
                     }
@@ -519,25 +582,39 @@ int main() {
             view = glm::translate(view, glm::vec3(0.0f, 0.0f, -2.0f)); 
             view = glm::lookAt(flyCam.GetPos(), flyCam.GetPos() + flyCam.GetFront(), flyCam.GetUp()); 
 
-            shader.Bind();
-            /* texture1.Bind(0); */
-            // TODO: figure out if better to compute mvp matrix on cpu vs doing it in vertex shader
-            // TODO: abstract camera out
-            shader.SetUniformMatrix4fv("model", model);
-            shader.SetUniformMatrix4fv("view", view);
-            shader.SetUniformMatrix4fv("projection", flyCam.GetProjection());
+            // render cube
+            {
+                cubeShader.Bind();
+                // TODO: figure out if better to compute mvp matrix on cpu vs doing it in vertex shader
+                cubeShader.SetUniformMatrix4fv("model", model);
+                cubeShader.SetUniformMatrix4fv("view", view);
+                cubeShader.SetUniformMatrix4fv("projection", flyCam.GetProjection());
 
-            glBindVertexArray(cubeVao.GetVaoId());
-            glDrawElements(GL_TRIANGLES, cubeVao.GetCountIndices(), GL_UNSIGNED_INT, 0);
+                cubeMesh.BindVao();
+                glDrawElements(GL_TRIANGLES, cubeMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
+            }
 
-            shader2.Bind();
-            glm::mat4 model2 = glm::mat4(1.0f);
-            shader2.SetUniformMatrix4fv("model", model2);
-            shader2.SetUniformMatrix4fv("view", view);
-            shader2.SetUniformMatrix4fv("projection", flyCam.GetProjection());
+            // render tiles
+            {
+                tilesShader.Bind();
+                tilesShader.SetUniformMatrix4fv("model", glm::mat4(1.0f));
+                tilesShader.SetUniformMatrix4fv("view", view);
+                tilesShader.SetUniformMatrix4fv("projection", flyCam.GetProjection());
 
-            glBindVertexArray(tilesVao.GetVaoId());
-            glDrawElements(GL_TRIANGLES, tilesVao.GetCountIndices(), GL_UNSIGNED_INT, 0);
+                tilesMesh.BindVao();
+                glDrawElements(GL_TRIANGLES, tilesMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
+            }
+
+            // render editor tiles
+            {
+                editorTilesShader.Bind();
+                editorTilesShader.SetUniformMatrix4fv("model", glm::mat4(1.0f));
+                editorTilesShader.SetUniformMatrix4fv("view", view);
+                editorTilesShader.SetUniformMatrix4fv("projection", flyCam.GetProjection());
+
+                editorTilesMesh.BindVao();
+                glDrawElements(GL_LINES, editorTilesMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
+            }
         }
 
         SDL_GL_SwapWindow(window);

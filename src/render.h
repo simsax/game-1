@@ -6,5 +6,6 @@
 #include <cstddef>
 
 std::vector<uint32_t> generateQuadIndices(size_t numQuads);
+std::vector<uint32_t> generateQuadLineIndices(size_t numQuads);
 
 #endif // RENDER_H

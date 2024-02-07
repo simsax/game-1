@@ -37,7 +37,6 @@ add_executable(${PROJECT_NAME}
     src/main.cpp
     src/utils.cpp
     src/shader.cpp
-    src/vao.cpp
     src/render.cpp
     src/texture.cpp
 )

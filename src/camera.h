@@ -31,7 +31,7 @@ public:
         m_BaseFov(fov),
         m_CurrentFov(fov),
         m_MouseSensitivity(mouseSensitivity),
-        m_Zoom(1.0f),
+        m_Zoom(10.0f),
         m_Yaw(-90.0f),
         m_Pitch(0.0f),
         m_Up(false),
@@ -164,22 +164,26 @@ void Camera<T>::Stop(Direction direction) {
 
 template <CameraType T>
 void Camera<T>::Turn(int xoffset, int yoffset) {
-    m_Yaw = glm::mod(m_Yaw + xoffset * m_MouseSensitivity, 360.0f);
-    m_Pitch += yoffset * m_MouseSensitivity;
+    if constexpr (T == CameraType::PERSPECTIVE) {
+        m_Yaw = glm::mod(m_Yaw + xoffset * m_MouseSensitivity, 360.0f);
+        m_Pitch += yoffset * m_MouseSensitivity;
 
-    // constrain m_Pitch to avoid weird camera movements
-    static constexpr float maxpitch = 89.0f;
-    if (m_Pitch > maxpitch)
-        m_Pitch = maxpitch;
-    if (m_Pitch < -maxpitch)
-        m_Pitch = -maxpitch;
+        // constrain m_Pitch to avoid weird camera movements
+        static constexpr float maxpitch = 89.0f;
+        if (m_Pitch > maxpitch)
+            m_Pitch = maxpitch;
+        if (m_Pitch < -maxpitch)
+            m_Pitch = -maxpitch;
 
-    // calculate camera direction
-    glm::vec3 direction;
-    direction.x = cos(glm::radians(m_Yaw)) * cos(glm::radians(m_Pitch));
-    direction.y = sin(glm::radians(m_Pitch));
-    direction.z = sin(glm::radians(m_Yaw)) * cos(glm::radians(m_Pitch));
-    m_CameraFront = glm::normalize(direction);
+        // calculate camera direction
+        glm::vec3 direction;
+        direction.x = cos(glm::radians(m_Yaw)) * cos(glm::radians(m_Pitch));
+        direction.y = sin(glm::radians(m_Pitch));
+        direction.z = sin(glm::radians(m_Yaw)) * cos(glm::radians(m_Pitch));
+        m_CameraFront = glm::normalize(direction);
+    } else {
+        // TODO
+    }
 }
 
 template <CameraType T>
@@ -195,7 +199,7 @@ void Camera<T>::Zoom(int verticalScroll) {
 
         m_Projection = glm::perspective(glm::radians(m_CurrentFov), m_AspectRatio, m_Znear, m_Zfar);
     } else {
-        m_Zoom -= verticalScroll;
+        m_Zoom += verticalScroll;
         m_Projection = glm::ortho(-m_AspectRatio*m_Zoom/2, m_AspectRatio*m_Zoom/2, -m_Zoom/2,
                 m_Zoom/2, m_Znear, m_Zfar);
     }
