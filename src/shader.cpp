@@ -37,7 +37,7 @@ Shader::Shader(const char* vertexShaderPath, const char* fragmentShaderPath) {
     glLinkProgram(m_ProgramId);
 
     glGetProgramiv(m_ProgramId, GL_LINK_STATUS, &success);
-    if(!success) {
+    if (!success) {
         glGetProgramInfoLog(m_ProgramId, 512, NULL, info);
         fprintf(stderr, "Shader linking failed with error: %s\n", info);
         exit(EXIT_FAILURE);

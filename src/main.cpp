@@ -1,8 +1,9 @@
 #include <SDL_keycode.h>
 #include <SDL_mouse.h>
 #include <SDL_stdinc.h>
+#include <SDL_video.h>
+#include <cmath>
 #include <cstdlib>
-#include <iostream>
 #include <SDL2/SDL.h>
 #include <glm/gtx/string_cast.hpp>
 #include "render.h"
@@ -11,8 +12,8 @@
 #include "shader.h"
 #include "mesh.h"
 #include "camera.h"
+#include "logger.h"
 
-#define ORTHO 1
 #define WIREFRAME 0
 
 #ifndef NDEBUG
@@ -26,7 +27,7 @@
 
 #define ABS_PATH(x) (PROJECT_SOURCE_DIR x)
 
-#define SDL_ERROR() fprintf(stderr, "SDL_Error: %s\n", SDL_GetError())
+#define SDL_ERROR() LOG_ERROR("SDL_Error: {}", SDL_GetError())
 #define BLACK 0,0,0
 
 enum class Rotation {
@@ -127,9 +128,16 @@ struct Vertex {
     glm::vec2 texture; // Probably I can cut this
 };
 
+struct EditorVertex {
+    glm::vec3 position;
+    glm::vec3 color;
+};
+
+
+
 struct Tile {
     void SetColor(const glm::vec3& color) {
-        for (Vertex& vertex : tileVertices) {
+        for (auto& vertex : tileVertices) {
             vertex.color = color;
         }
     }
@@ -139,8 +147,14 @@ struct Tile {
 };
 
 struct EditorTile {
+    void SetColor(const glm::vec3& color) {
+        for (auto& vertex : tileVertices) {
+            vertex.color = color;
+        }
+    }
+
     static constexpr int numVertices = 4;
-    glm::vec3 tileVertices[numVertices]; // mesh
+    EditorVertex tileVertices[numVertices]; // mesh
 };
 
 // TODO: face culling
@@ -160,7 +174,7 @@ int main() {
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 #ifdef DEBUG
-    printf("DEBUG ON\n");
+    LOG_DEBUG("DEBUG ON");
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #endif
 
@@ -202,6 +216,7 @@ int main() {
     glEnable(GL_MULTISAMPLE); 
 	glEnable(GL_LINE_SMOOTH);
 	glLineWidth(2);
+    SDL_GL_SetSwapInterval(0); // read the docs (can be 0, 1, -1)
 
     std::vector<Vertex> cubeVertices = {
         // up
@@ -250,10 +265,10 @@ int main() {
     for (int z = 0; z < sideNum; z++) {
         for (int x = 0; x < sideNum; x++) {
             tilesVector.push_back({
-                Vertex{glm::vec3(x, 0.0f, z),         glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 0.0f)},
-                Vertex{glm::vec3(x + 1, 0.0f, z),     glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 0.0f)},
-                Vertex{glm::vec3(x + 1, 0.0f, z + 1), glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(1.0f, 1.0f)},
-                Vertex{glm::vec3(x, 0.0f, z + 1),     glm::vec3(1.0f, 1.0f, 1.0f),  glm::vec2(0.0f, 1.0f)}
+                Vertex{glm::vec3(x, 0.0f, z),         glm::vec3(1.0f),  glm::vec2(0.0f, 0.0f)},
+                Vertex{glm::vec3(x + 1, 0.0f, z),     glm::vec3(1.0f),  glm::vec2(1.0f, 0.0f)},
+                Vertex{glm::vec3(x + 1, 0.0f, z + 1), glm::vec3(1.0f),  glm::vec2(1.0f, 1.0f)},
+                Vertex{glm::vec3(x, 0.0f, z + 1),     glm::vec3(1.0f),  glm::vec2(0.0f, 1.0f)}
             });
         }
     }
@@ -263,14 +278,14 @@ int main() {
     std::vector<EditorTile> editorTilesVector;
     editorTilesVector.reserve(numTilesEditor);
 
-    int offset = sideNumEditor / 2;
+    static constexpr int offset = sideNumEditor / 2;
     for (int z = 0; z < sideNumEditor; z++) {
         for (int x = 0; x < sideNumEditor; x++) {
             editorTilesVector.push_back({
-                    glm::vec3(x - offset, 0.0f, z - offset),
-                    glm::vec3(x + 1 - offset, 0.0f, z - offset),
-                    glm::vec3(x + 1 - offset, 0.0f, z + 1 - offset),
-                    glm::vec3(x - offset, 0.0f, z + 1 - offset)
+                    EditorVertex{glm::vec3(x - offset, 0.0f, z - offset), glm::vec3(1.0f)},
+                    EditorVertex{glm::vec3(x + 1 - offset, 0.0f, z - offset), glm::vec3(1.0f)},
+                    EditorVertex{glm::vec3(x + 1 - offset, 0.0f, z + 1 - offset), glm::vec3(1.0f)},
+                    EditorVertex{glm::vec3(x - offset, 0.0f, z + 1 - offset), glm::vec3(1.0f)}
             });
         }
     }
@@ -292,6 +307,7 @@ int main() {
     };
 
     std::vector<Layout> editorTilesLayout = {
+        { GL_FLOAT, 3 },
         { GL_FLOAT, 3 }
     };
 
@@ -317,13 +333,14 @@ int main() {
             tilesIndices.size() * sizeof(uint32_t));
 
 
-    // use this for the raycasted tile
-    /* Mesh editorTilesMesh = Mesh( */
-    /*         editorTilesVector.data(), */
-    /*         editorTilesVector.size(), */
-    /*         editorTilesVector.size() * sizeof(EditorTile), */
-    /*         tilesLayout, */
-    /*         GL_STATIC_DRAW); */
+    EditorTile castedTile = {
+        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
+        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
+        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
+        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
+    };
+
+    Mesh castedTileMesh = Mesh(&castedTile, EditorTile::numVertices, sizeof(EditorTile), tilesLayout, GL_DYNAMIC_DRAW);
 
     Mesh editorTilesMesh = Mesh(
             editorTilesVector.data(),
@@ -350,21 +367,21 @@ int main() {
 
     // some globals (outside the game loop)
     bool quit = false;
-    float deltaTime = 0.0f; // time between current and last frame
-    float lastFrame = 0.0f; // time of last frame
-
-    // camera
-#if ORTHO
-    auto flyCam = Camera<CameraType::ORTHOGRAPHIC>(
+    bool mouseCaptured = true;
+    CameraType cameraType = CameraType::ORTHOGRAPHIC;
+    static constexpr float zoom = 10.0f;
+    static constexpr float orthoWidth = ASPECT_RATIO * zoom;
+    static constexpr float orthoHeight = zoom;
+    Camera orthoCam = Camera<CameraType::ORTHOGRAPHIC>(
             ASPECT_RATIO, 0.1f, 100.0f,
             glm::vec3(-6.0f, 15.0f,  18.0f),
             glm::vec3(0.32f, -0.63f, -0.7f),
             glm::vec3(0.0f, 1.0f, 0.0f),
             10.0f,
             70.0f,
-            0.1f);
-#else
-    auto flyCam = Camera<CameraType::PERSPECTIVE>(
+            0.1f,
+            zoom);
+    Camera perspectiveCam = Camera<CameraType::PERSPECTIVE>(
             ASPECT_RATIO, 0.1f, 100.0f,
             glm::vec3(0.0f, 0.0f,  3.0f),
             glm::vec3(0.0f, 0.0f, -1.0f),
@@ -372,8 +389,6 @@ int main() {
             10.0f,
             70.0f,
             0.1f);
-#endif
-
     glm::vec3 pos = glm::vec3(0.0f);
     glm::vec3 absoluteTrans = glm::vec3(0.5f);
     glm::mat4 model = glm::translate(glm::mat4(1.0f), absoluteTrans);
@@ -386,6 +401,11 @@ int main() {
     float rotationSpeed = 10.0f;
     float t = 0.0f;
     Rotation rotation;
+    bool editorMode = false; // maybe this will turn into an enum
+    double deltaTime = 0; // time between current and last frame
+    double lastTime = 0; // time of last frame
+    double prevTime = 0; // start time of the current second
+    int numFrames = 0;
 
     // game loop
     while(!quit) {
@@ -401,22 +421,36 @@ int main() {
                             quit = true;
                             break;
                         case SDLK_w:
-                            flyCam.Move(Direction::FORWARD);
+                            if (cameraType == CameraType::PERSPECTIVE)
+                                perspectiveCam.Move(Direction::FORWARD);
+                            else
+                                orthoCam.Move(Direction::UP);
                             break;
                         case SDLK_a:
-                            flyCam.Move(Direction::LEFT);
+                            if (cameraType == CameraType::PERSPECTIVE)
+                                perspectiveCam.Move(Direction::LEFT);
+                            else
+                                orthoCam.Move(Direction::LEFT);
                             break;
                         case SDLK_s:
-                            flyCam.Move(Direction::BACKWARDS);
+                            if (cameraType == CameraType::PERSPECTIVE)
+                                perspectiveCam.Move(Direction::BACKWARDS);
+                            else
+                                orthoCam.Move(Direction::DOWN);
                             break;
                         case SDLK_d:
-                            flyCam.Move(Direction::RIGHT);
+                            if (cameraType == CameraType::PERSPECTIVE)
+                                perspectiveCam.Move(Direction::RIGHT);
+                            else
+                                orthoCam.Move(Direction::RIGHT);
                             break;
                         case SDLK_SPACE:
-                            flyCam.Move(Direction::UP);
+                            if (cameraType == CameraType::PERSPECTIVE)
+                                perspectiveCam.Move(Direction::UP);
                             break;
                         case SDLK_LCTRL:
-                            flyCam.Move(Direction::DOWN);
+                            if (cameraType == CameraType::PERSPECTIVE)
+                                perspectiveCam.Move(Direction::DOWN);
                             break;
                         case SDLK_DOWN:
                             if (!rotating) {
@@ -469,22 +503,46 @@ int main() {
                 case SDL_KEYUP:
                     switch (event.key.keysym.sym) {
                         case SDLK_w:
-                            flyCam.Stop(Direction::FORWARD);
+                            if (cameraType == CameraType::PERSPECTIVE)
+                                perspectiveCam.Stop(Direction::FORWARD);
+                            else
+                                orthoCam.Stop(Direction::UP);
                             break;
                         case SDLK_a:
-                            flyCam.Stop(Direction::LEFT);
+                            if (cameraType == CameraType::PERSPECTIVE)
+                                perspectiveCam.Stop(Direction::LEFT);
+                            else
+                                orthoCam.Stop(Direction::LEFT);
                             break;
                         case SDLK_s:
-                            flyCam.Stop(Direction::BACKWARDS);
+                            if (cameraType == CameraType::PERSPECTIVE)
+                                perspectiveCam.Stop(Direction::BACKWARDS);
+                            else
+                                orthoCam.Stop(Direction::DOWN);
                             break;
                         case SDLK_d:
-                            flyCam.Stop(Direction::RIGHT);
+                            if (cameraType == CameraType::PERSPECTIVE)
+                                perspectiveCam.Stop(Direction::RIGHT);
+                            else
+                                orthoCam.Stop(Direction::RIGHT);
                             break;
                         case SDLK_SPACE:
-                            flyCam.Stop(Direction::UP);
+                            if (cameraType == CameraType::PERSPECTIVE)
+                                perspectiveCam.Stop(Direction::UP);
                             break;
                         case SDLK_LCTRL:
-                            flyCam.Stop(Direction::DOWN);
+                            if (cameraType == CameraType::PERSPECTIVE)
+                                perspectiveCam.Stop(Direction::DOWN);
+                            break;
+                        case SDLK_m:
+                            mouseCaptured = !mouseCaptured;
+                            break;
+                        case SDLK_c:
+                            cameraType = cameraType == CameraType::PERSPECTIVE ?
+                                CameraType::ORTHOGRAPHIC : CameraType::PERSPECTIVE;
+                            break;
+                        case SDLK_e:
+                            editorMode = !editorMode;
                             break;
                         default:
                             break;
@@ -511,115 +569,191 @@ int main() {
                         // retrieve x and y offset from mouse movement
                         int xoffset = event.motion.xrel;
                         int yoffset = -event.motion.yrel; // down is 1 for SDL but -1 for OpenGL coords
-                        flyCam.Turn(xoffset, yoffset);
+                        if (mouseCaptured and cameraType == CameraType::PERSPECTIVE)
+                            perspectiveCam.Turn(xoffset, yoffset);
                     }
                     break;
                 case SDL_MOUSEWHEEL:
                     {
-                        flyCam.Zoom(-event.wheel.y);
+                        if (cameraType == CameraType::PERSPECTIVE)
+                            perspectiveCam.Zoom(event.wheel.y);
                     }
                 default:
                     break;
             }
         }
 
+        if (mouseCaptured)
+            SDL_SetRelativeMouseMode(SDL_TRUE);
+        else
+            SDL_SetRelativeMouseMode(SDL_FALSE);
+
         // update
-        float time = SDL_GetTicks() / 1000.0f;
-        deltaTime = time - lastFrame;
-        lastFrame = time;
-        flyCam.Update(deltaTime);
+        double time = SDL_GetTicks() / 1000.0;
+        deltaTime = time - lastTime;
+        lastTime = time;
+        numFrames++;
+
+        if (lastTime - prevTime >= 1) {
+            LOG_INFO("FPS: {} / ms: {:.3}", numFrames, 1000.0f / numFrames);
+            numFrames = 0;
+            prevTime = lastTime;
+        }
+
+        // camera update
+        glm::mat4 view;
+        if (cameraType == CameraType::PERSPECTIVE) {
+            perspectiveCam.Update(deltaTime);
+            view = glm::lookAt(perspectiveCam.GetPos(), perspectiveCam.GetPos() + perspectiveCam.GetFront(), perspectiveCam.GetUp()); 
+        }
+        else {
+            orthoCam.Update(deltaTime);
+            view = glm::lookAt(orthoCam.GetPos(), orthoCam.GetPos() + orthoCam.GetFront(), orthoCam.GetUp()); 
+        }
+
+        // raycast
+        bool tileIsCasted = false;
+        if (editorMode) {
+            int x, y;
+            uint32_t mouseState = SDL_GetMouseState(&x, &y);
+            glm::vec4 ndcHomo = glm::vec4(
+                    2.0f * x / SCREEN_WIDTH - 1.0f, -2.0f * y / SCREEN_HEIGHT + 1.0f, -1.0f, 1.0f);
+
+            glm::vec4 rayEye;
+            glm::vec3 planeNormal = glm::vec3(0.0f, -1.0f, 0.0f);
+            glm::vec3 rayWorld;
+            glm::vec3 cameraPos;
+
+            if (cameraType == CameraType::PERSPECTIVE) {
+                rayEye = glm::inverse(perspectiveCam.GetProjection()) * ndcHomo;
+                rayEye.z = -1.0f;
+                rayEye.w = 0.0f;
+
+                glm::vec4 rayWorld4 = glm::inverse(view) * rayEye;
+                rayWorld = glm::normalize(glm::vec3(rayWorld4.x, rayWorld4.y, rayWorld4.z));
+                cameraPos = perspectiveCam.GetPos();
+            } else {
+                float xOrthoOffset = ndcHomo.x * orthoWidth / 2;
+                float yOrthoOffset = ndcHomo.y * orthoHeight / 2;
+
+                // For orthographic projection, the ray direction is constant and does not depend on the mouse position.
+                rayWorld = glm::normalize(orthoCam.GetFront());
+                glm::vec3 right = glm::normalize(glm::cross(orthoCam.GetFront(), orthoCam.GetUp()));
+                glm::vec3 up = glm::normalize(glm::cross(right, orthoCam.GetFront()));
+                cameraPos = orthoCam.GetPos() + right * xOrthoOffset + up * yOrthoOffset;
+            }
+            float dot = glm::dot(rayWorld, planeNormal);
+            if (dot >= 0.0f) {
+                float t = cameraPos.y / dot;
+                glm::vec3 raycastedPoint = cameraPos + rayWorld * t;
+
+                int tileX = floor(raycastedPoint.x);
+                int tileZ = floor(raycastedPoint.z);
+                tileX += offset;
+                tileZ += offset;
+
+                int tileIx = tileZ * sideNumEditor + tileX;
+                if (tileX >= 0 && tileZ >= 0 && tileX < sideNumEditor && tileZ < sideNumEditor) {
+                    tileIsCasted = true;
+                    castedTile = editorTilesVector[tileIx];
+                    castedTile.SetColor(glm::vec3(0, 1, 0));
+                    castedTileMesh.UpdateBufferData(0, sizeof(EditorTile), &castedTile);
+                }
+            }
+        }
+
+        // update color only when hovered tile changes, not every frame
 
         // render
+        glClearColor(BLACK, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        if (rotating) {
+            t += deltaTime * rotationSpeed; // make it a fixed update maybe
+            if (t >= 1.0f) {
+                t = 1.0f;
+                rotating = false;
+            }
+            curAngle = t * angle;
+            glm::mat4 trans = glm::translate(glm::mat4(1.0), - absoluteTrans - pos + translationAxis);
+            glm::mat4 transBack = glm::translate(glm::mat4(1.0), absoluteTrans + pos - translationAxis);
+            model = transBack * glm::rotate(glm::mat4(1.0), glm::radians(curAngle), axis) * trans * frozenModel;
+            if (!rotating) {
+                curAngle = 0.0f;
+                t = 0.0f;
+                // update the position only after the rotation has finished
+                switch (rotation) {
+                    case Rotation::UP:
+                        pos.z -= 1;
+                        break;
+                    case Rotation::DOWN:
+                        pos.z += 1;
+                        break;
+                    case Rotation::LEFT:
+                        pos.x -= 1;
+                        break;
+                    case Rotation::RIGHT:
+                        pos.x += 1;
+                        break;
+                    default:
+                        break;
+                }
+                Face downFace = cubeState[(int)Orientation::DOWN];
+                if (downFace == Face::F) {
+                    int tileIx = pos.z * sideNum + pos.x;
+                    if (pos.x >= 0 && pos.z >= 0 && pos.x < sideNum && pos.z < sideNum) {
+                        tilesVector[tileIx].SetColor({1, 0, 0});
+                        tilesMesh.UpdateBufferData(tileIx * sizeof(Tile), sizeof(Tile), &tilesVector[tileIx]);
+                        LOG_INFO("Red face is down, replacing tile at index: {}", tileIx);
+                    }
+                }
+            }
+        }
+
+        const glm::mat4& projection = cameraType == CameraType::PERSPECTIVE ? perspectiveCam.GetProjection()
+            : orthoCam.GetProjection();
+
+        glm::mat4 vp = projection * view;
+    
+        // render cube
         {
-            glClearColor(BLACK, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glm::mat4 mvp = vp * model;
+            cubeShader.Bind();
+            cubeShader.SetUniformMatrix4fv("mvp", mvp);
 
-            if (rotating) {
-                t += deltaTime * rotationSpeed; // make it a fixed update maybe
-                if (t >= 1.0f) {
-                    t = 1.0f;
-                    rotating = false;
-                }
-                curAngle = t * angle;
-                glm::mat4 trans = glm::translate(glm::mat4(1.0), - absoluteTrans - pos + translationAxis);
-                glm::mat4 transBack = glm::translate(glm::mat4(1.0), absoluteTrans + pos - translationAxis);
-                model = transBack * glm::rotate(glm::mat4(1.0), glm::radians(curAngle), axis) * trans * frozenModel;
-                if (!rotating) {
-                    curAngle = 0.0f;
-                    t = 0.0f;
-                    // update the position only after the rotation has finished
-                    switch (rotation) {
-                        case Rotation::UP:
-                            pos.z -= 1;
-                            break;
-                        case Rotation::DOWN:
-                            pos.z += 1;
-                            break;
-                        case Rotation::LEFT:
-                            pos.x -= 1;
-                            break;
-                        case Rotation::RIGHT:
-                            pos.x += 1;
-                            break;
-                        default:
-                            break;
-                    }
-                    Face downFace = cubeState[(int)Orientation::DOWN];
-                    if (downFace == Face::F) {
-                        int tileIx = pos.z * sideNum + pos.x;
-                        if (pos.x >= 0 && pos.z >= 0 && pos.x < sideNum && pos.z < sideNum) {
-                            tilesVector[tileIx].SetColor({1, 0, 0});
-                            tilesMesh.UpdateBufferData(tileIx * sizeof(Tile), sizeof(Tile), &tilesVector[tileIx]);
-                            printf("Red face is down, replacing tile at index: %d\n", tileIx);
-                        }
-                    }
-                }
-            }
+            cubeMesh.BindVao();
+            glDrawElements(GL_TRIANGLES, cubeMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
+        }
 
+        // render tiles
+        {
+            tilesShader.Bind();
+            tilesShader.SetUniformMatrix4fv("mvp", vp);
 
-            glm::mat4 view = glm::mat4(1.0f);
-            // note that we're translating the scene in the reverse direction of where we want to move
-            view = glm::translate(view, glm::vec3(0.0f, 0.0f, -2.0f)); 
-            view = glm::lookAt(flyCam.GetPos(), flyCam.GetPos() + flyCam.GetFront(), flyCam.GetUp()); 
+            tilesMesh.BindVao();
+            glDrawElements(GL_TRIANGLES, tilesMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
+        }
 
-            // render cube
-            {
-                cubeShader.Bind();
-                // TODO: figure out if better to compute mvp matrix on cpu vs doing it in vertex shader
-                cubeShader.SetUniformMatrix4fv("model", model);
-                cubeShader.SetUniformMatrix4fv("view", view);
-                cubeShader.SetUniformMatrix4fv("projection", flyCam.GetProjection());
+        // render editor tiles
+        if (editorMode) {
+            editorTilesShader.Bind();
+            editorTilesShader.SetUniformMatrix4fv("mvp", vp);
 
-                cubeMesh.BindVao();
-                glDrawElements(GL_TRIANGLES, cubeMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
-            }
-
-            // render tiles
-            {
-                tilesShader.Bind();
-                tilesShader.SetUniformMatrix4fv("model", glm::mat4(1.0f));
-                tilesShader.SetUniformMatrix4fv("view", view);
-                tilesShader.SetUniformMatrix4fv("projection", flyCam.GetProjection());
-
-                tilesMesh.BindVao();
-                glDrawElements(GL_TRIANGLES, tilesMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
-            }
-
-            // render editor tiles
-            {
-                editorTilesShader.Bind();
-                editorTilesShader.SetUniformMatrix4fv("model", glm::mat4(1.0f));
-                editorTilesShader.SetUniformMatrix4fv("view", view);
-                editorTilesShader.SetUniformMatrix4fv("projection", flyCam.GetProjection());
-
-                editorTilesMesh.BindVao();
-                glDrawElements(GL_LINES, editorTilesMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
+            editorTilesMesh.BindVao();
+            glDrawElements(GL_LINES, editorTilesMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
+            // render raycasted tile
+            if (tileIsCasted) {
+                castedTileMesh.BindVao();
+                glLineWidth(8);
+                glDisable(GL_DEPTH_TEST);
+                glDrawArrays(GL_LINE_LOOP, 0, 4);
+                glLineWidth(2);
+                glEnable(GL_DEPTH_TEST);
             }
         }
 
         SDL_GL_SwapWindow(window);
     }
-
 
     SDL_GL_DeleteContext(context);
     SDL_DestroyWindow(window);

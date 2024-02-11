@@ -19,7 +19,7 @@ template <CameraType T>
 class Camera {
 public:
     Camera(float aspectRatio, float zNear, float zFar, const glm::vec3& cameraPos, const glm::vec3& cameraFront,
-           const glm::vec3& cameraUp, float speed, float fov, float mouseSensitivity) : 
+           const glm::vec3& cameraUp, float speed, float fov, float mouseSensitivity, float zoom = 10.0f) : 
         m_AspectRatio(aspectRatio),
         m_Znear(zNear),
         m_Zfar(zFar),
@@ -31,7 +31,7 @@ public:
         m_BaseFov(fov),
         m_CurrentFov(fov),
         m_MouseSensitivity(mouseSensitivity),
-        m_Zoom(10.0f),
+        m_Zoom(zoom),
         m_Yaw(-90.0f),
         m_Pitch(0.0f),
         m_Up(false),
