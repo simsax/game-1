@@ -1,6 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "texture.h"
+#include "logger.h"
 
 Texture::Texture(const char* path, GLenum internalFormat, GLenum externalFormat) : m_TextureId(0) {
     glGenTextures(1, &m_TextureId);
@@ -18,7 +19,7 @@ Texture::Texture(const char* path, GLenum internalFormat, GLenum externalFormat)
 	stbi_set_flip_vertically_on_load(true);
     uint8_t *data = stbi_load(path, &width, &height, &nrChannels, 0); 
     if (data == nullptr) {
-        fprintf(stderr, "Failed at loading image: %s\n", path);
+        LOG_ERROR("Failed at loading image: {}", path);
         exit(EXIT_FAILURE);
     }
     stbi_image_free(data);

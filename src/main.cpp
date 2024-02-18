@@ -23,12 +23,10 @@
 // this will be changed dynamically to allow resizing
 #define SCREEN_WIDTH 1920
 #define SCREEN_HEIGHT 1080
-#define ASPECT_RATIO ((float)SCREEN_WIDTH / (float)SCREEN_HEIGHT)
 
 #define ABS_PATH(x) (PROJECT_SOURCE_DIR x)
 
 #define SDL_ERROR() LOG_ERROR("SDL_Error: {}", SDL_GetError())
-#define BLACK 0,0,0
 
 enum class Rotation {
     DOWN,
@@ -133,7 +131,10 @@ struct EditorVertex {
     glm::vec3 color;
 };
 
-
+struct LineVertex {
+    static constexpr int numVertices = 2;
+    EditorVertex tileVertices[numVertices]; // mesh
+};
 
 struct Tile {
     void SetColor(const glm::vec3& color) {
@@ -216,7 +217,8 @@ int main() {
     glEnable(GL_MULTISAMPLE); 
 	glEnable(GL_LINE_SMOOTH);
 	glLineWidth(2);
-    SDL_GL_SetSwapInterval(0); // read the docs (can be 0, 1, -1)
+    // v sync (disable when profiling performance)
+    SDL_GL_SetSwapInterval(1); // read the docs (can be 0, 1, -1)
 
     std::vector<Vertex> cubeVertices = {
         // up
@@ -294,6 +296,29 @@ int main() {
     std::vector<uint32_t> tilesIndices = generateQuadIndices(numTiles);
     std::vector<uint32_t> editorTilesIndices = generateQuadLineIndices(numTilesEditor);
 
+    EditorTile castedTile = {
+        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
+        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
+        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
+        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
+    };
+
+    static constexpr float halfLength = 1000.0f;
+    std::vector<LineVertex> axisLines = {
+        LineVertex({
+                EditorVertex{glm::vec3(-halfLength, 0, 0), glm::vec3(1,0,0)},
+                EditorVertex{glm::vec3(halfLength, 0, 0), glm::vec3(1,0,0)},
+                }),
+        LineVertex({
+                EditorVertex{glm::vec3(0, -halfLength, 0), glm::vec3(0,1,0)},
+                EditorVertex{glm::vec3(0, halfLength, 0), glm::vec3(0,1,0)},
+                }),
+        LineVertex({
+                EditorVertex{glm::vec3(0, 0, -halfLength), glm::vec3(0,0,1)},
+                EditorVertex{glm::vec3(0, 0, halfLength), glm::vec3(0,0,1)},
+                }),
+    };
+
     std::vector<Layout> cubeLayout = {
         { GL_FLOAT, 3 },
         { GL_FLOAT, 3 },
@@ -333,13 +358,6 @@ int main() {
             tilesIndices.size() * sizeof(uint32_t));
 
 
-    EditorTile castedTile = {
-        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
-        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
-        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
-        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
-    };
-
     Mesh castedTileMesh = Mesh(&castedTile, EditorTile::numVertices, sizeof(EditorTile), tilesLayout, GL_DYNAMIC_DRAW);
 
     Mesh editorTilesMesh = Mesh(
@@ -351,6 +369,13 @@ int main() {
             editorTilesIndices.data(),
             editorTilesIndices.size(),
             editorTilesIndices.size() * sizeof(uint32_t));
+
+    Mesh axisLinesMesh = Mesh(
+            axisLines.data(),
+            axisLines.size() * LineVertex::numVertices,
+            axisLines.size() * sizeof(LineVertex),
+            editorTilesLayout,
+            GL_STATIC_DRAW);
 
     // compile and link shaders
     Shader cubeShader = Shader(
@@ -367,22 +392,22 @@ int main() {
 
     // some globals (outside the game loop)
     bool quit = false;
-    bool mouseCaptured = true;
+    bool mouseCaptured = false;
     CameraType cameraType = CameraType::ORTHOGRAPHIC;
     static constexpr float zoom = 10.0f;
-    static constexpr float orthoWidth = ASPECT_RATIO * zoom;
-    static constexpr float orthoHeight = zoom;
+    static constexpr glm::vec3 orthoPos = glm::vec3(-20.0f, 20.0f,  20.0f);
+    static const glm::vec3 orthoFront = - glm::normalize(orthoPos);
     Camera orthoCam = Camera<CameraType::ORTHOGRAPHIC>(
-            ASPECT_RATIO, 0.1f, 100.0f,
-            glm::vec3(-6.0f, 15.0f,  18.0f),
-            glm::vec3(0.32f, -0.63f, -0.7f),
+            SCREEN_WIDTH, SCREEN_HEIGHT, 0.1f, 100.0f,
+            orthoPos,
+            orthoFront,
             glm::vec3(0.0f, 1.0f, 0.0f),
             10.0f,
             70.0f,
             0.1f,
             zoom);
     Camera perspectiveCam = Camera<CameraType::PERSPECTIVE>(
-            ASPECT_RATIO, 0.1f, 100.0f,
+            SCREEN_WIDTH, SCREEN_HEIGHT, 0.1f, 100.0f,
             glm::vec3(0.0f, 0.0f,  3.0f),
             glm::vec3(0.0f, 0.0f, -1.0f),
             glm::vec3(0.0f, 1.0f, 0.0f),
@@ -406,6 +431,8 @@ int main() {
     double lastTime = 0; // time of last frame
     double prevTime = 0; // start time of the current second
     int numFrames = 0;
+    bool wheelPressed = false;
+    bool shiftPressed = false;
 
     // game loop
     while(!quit) {
@@ -496,6 +523,9 @@ int main() {
                                 turn(cubeState, rotation);
                             }
                             break;
+                        case SDLK_LSHIFT:
+                            shiftPressed = true;
+                            break;
                         default:
                             break;
                     }
@@ -538,12 +568,22 @@ int main() {
                             mouseCaptured = !mouseCaptured;
                             break;
                         case SDLK_c:
-                            cameraType = cameraType == CameraType::PERSPECTIVE ?
-                                CameraType::ORTHOGRAPHIC : CameraType::PERSPECTIVE;
+                            {
+                                cameraType = cameraType == CameraType::PERSPECTIVE ?
+                                    CameraType::ORTHOGRAPHIC : CameraType::PERSPECTIVE;
+
+                                // uncapture mouse by default when in ortographic mode
+                                if (cameraType == CameraType::ORTHOGRAPHIC)
+                                    mouseCaptured = false;
+                                else
+                                    mouseCaptured = true;
+                            }
                             break;
                         case SDLK_e:
                             editorMode = !editorMode;
                             break;
+                        case SDLK_LSHIFT:
+                            shiftPressed = false;
                         default:
                             break;
                     }
@@ -555,6 +595,9 @@ int main() {
                     /* } else if (event.button.button == SDL_BUTTON_RIGHT) { */
                     /*     mouse_down(RIGHT_BUTTON); */
                     /* } */
+                    if (event.button.button == SDL_BUTTON_MIDDLE) {
+                        wheelPressed = true;
+                    }
                     break;
                 case SDL_MOUSEBUTTONUP:
                     /* if (event.button.button == SDL_BUTTON_LEFT) { */
@@ -563,21 +606,53 @@ int main() {
                     /* } else if (event.button.button == SDL_BUTTON_RIGHT) { */
                     /*     mouse_up(RIGHT_BUTTON); */
                     /* } */
+                    if (event.button.button == SDL_BUTTON_MIDDLE) {
+                        wheelPressed = false;
+                    }
                     break;
                 case SDL_MOUSEMOTION:
                     {
                         // retrieve x and y offset from mouse movement
                         int xoffset = event.motion.xrel;
                         int yoffset = -event.motion.yrel; // down is 1 for SDL but -1 for OpenGL coords
-                        if (mouseCaptured and cameraType == CameraType::PERSPECTIVE)
-                            perspectiveCam.Turn(xoffset, yoffset);
+                        if (cameraType == CameraType::PERSPECTIVE) {
+                            if (mouseCaptured) {
+                                perspectiveCam.Turn(xoffset, yoffset);
+                            }
+                            else {
+                                if (wheelPressed) {
+                                    if (shiftPressed) {
+                                        // pan
+                                        perspectiveCam.Pan(xoffset, yoffset);
+                                    } else {
+                                        // turn
+                                        perspectiveCam.Orbit(xoffset, yoffset);
+                                    }
+                                }
+                            }
+                        } else { // orthographic
+                            if (wheelPressed) {
+                                if (shiftPressed) {
+                                    // pan
+                                    orthoCam.Pan(xoffset, yoffset);
+                                } else {
+                                    // turn
+                                    /* orthoCam.Turn(xoffset, yoffset); */
+                                    glm::vec3 target = glm::vec3(0);
+                                    orthoCam.Orbit(xoffset, yoffset);
+                                }
+                            }
+                        }
                     }
                     break;
                 case SDL_MOUSEWHEEL:
                     {
                         if (cameraType == CameraType::PERSPECTIVE)
                             perspectiveCam.Zoom(event.wheel.y);
+                        else
+                            orthoCam.Zoom(event.wheel.y);
                     }
+                    break;
                 default:
                     break;
             }
@@ -595,25 +670,20 @@ int main() {
         numFrames++;
 
         if (lastTime - prevTime >= 1) {
-            LOG_INFO("FPS: {} / ms: {:.3}", numFrames, 1000.0f / numFrames);
+            // LOG_INFO("FPS: {} / ms: {:.3}", numFrames, 1000.0f / numFrames);
             numFrames = 0;
             prevTime = lastTime;
         }
 
         // camera update
-        glm::mat4 view;
-        if (cameraType == CameraType::PERSPECTIVE) {
+        if (cameraType == CameraType::PERSPECTIVE)
             perspectiveCam.Update(deltaTime);
-            view = glm::lookAt(perspectiveCam.GetPos(), perspectiveCam.GetPos() + perspectiveCam.GetFront(), perspectiveCam.GetUp()); 
-        }
-        else {
+        else
             orthoCam.Update(deltaTime);
-            view = glm::lookAt(orthoCam.GetPos(), orthoCam.GetPos() + orthoCam.GetFront(), orthoCam.GetUp()); 
-        }
 
         // raycast
         bool tileIsCasted = false;
-        if (editorMode) {
+        if (editorMode && !mouseCaptured) {
             int x, y;
             uint32_t mouseState = SDL_GetMouseState(&x, &y);
             glm::vec4 ndcHomo = glm::vec4(
@@ -629,15 +699,16 @@ int main() {
                 rayEye.z = -1.0f;
                 rayEye.w = 0.0f;
 
-                glm::vec4 rayWorld4 = glm::inverse(view) * rayEye;
-                rayWorld = glm::normalize(glm::vec3(rayWorld4.x, rayWorld4.y, rayWorld4.z));
+                /* glm::vec4 rayWorld4 = glm::inverse(view) * rayEye; */
+                /* rayWorld = glm::normalize(glm::vec3(rayWorld4.x, rayWorld4.y, rayWorld4.z)); */
+                rayWorld = glm::normalize(glm::inverse(perspectiveCam.GetView()) * rayEye);
                 cameraPos = perspectiveCam.GetPos();
             } else {
-                float xOrthoOffset = ndcHomo.x * orthoWidth / 2;
-                float yOrthoOffset = ndcHomo.y * orthoHeight / 2;
+                float xOrthoOffset = ndcHomo.x * orthoCam.GetOrthoWidth() / 2;
+                float yOrthoOffset = ndcHomo.y * orthoCam.GetOrthoHeight() / 2;
 
                 // For orthographic projection, the ray direction is constant and does not depend on the mouse position.
-                rayWorld = glm::normalize(orthoCam.GetFront());
+                rayWorld = orthoCam.GetFront();
                 glm::vec3 right = glm::normalize(glm::cross(orthoCam.GetFront(), orthoCam.GetUp()));
                 glm::vec3 up = glm::normalize(glm::cross(right, orthoCam.GetFront()));
                 cameraPos = orthoCam.GetPos() + right * xOrthoOffset + up * yOrthoOffset;
@@ -665,7 +736,7 @@ int main() {
         // update color only when hovered tile changes, not every frame
 
         // render
-        glClearColor(BLACK, 1.0f);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (rotating) {
@@ -713,6 +784,9 @@ int main() {
         const glm::mat4& projection = cameraType == CameraType::PERSPECTIVE ? perspectiveCam.GetProjection()
             : orthoCam.GetProjection();
 
+        const glm::mat4& view = cameraType == CameraType::PERSPECTIVE ? perspectiveCam.GetView()
+            : orthoCam.GetView();
+
         glm::mat4 vp = projection * view;
     
         // render cube
@@ -734,23 +808,32 @@ int main() {
             glDrawElements(GL_TRIANGLES, tilesMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
         }
 
-        // render editor tiles
+        // render level editor 
         if (editorMode) {
             editorTilesShader.Bind();
             editorTilesShader.SetUniformMatrix4fv("mvp", vp);
 
             editorTilesMesh.BindVao();
             glDrawElements(GL_LINES, editorTilesMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
+
+            // render axis
+            axisLinesMesh.BindVao();
+            glLineWidth(4);
+            glDrawArrays(GL_LINES, 0, axisLinesMesh.GetNumVertices());
+            glLineWidth(2);
+
             // render raycasted tile
             if (tileIsCasted) {
                 castedTileMesh.BindVao();
                 glLineWidth(8);
                 glDisable(GL_DEPTH_TEST);
-                glDrawArrays(GL_LINE_LOOP, 0, 4);
+                glDrawArrays(GL_LINE_LOOP, 0, castedTileMesh.GetNumVertices());
                 glLineWidth(2);
                 glEnable(GL_DEPTH_TEST);
             }
+
         }
+
 
         SDL_GL_SwapWindow(window);
     }

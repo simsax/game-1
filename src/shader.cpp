@@ -1,5 +1,6 @@
 #include "shader.h"
 #include "utils.h"
+#include "logger.h"
 
 Shader::Shader(const char* vertexShaderPath, const char* fragmentShaderPath) {
     // compile vertex shader
@@ -13,7 +14,7 @@ Shader::Shader(const char* vertexShaderPath, const char* fragmentShaderPath) {
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(vertexShader, 512, NULL, info);
-        fprintf(stderr, "Vertex shader compilation failed with error: %s\n", info);
+        LOG_ERROR("Vertex shader compilation failed with error: {}", info);
         exit(EXIT_FAILURE);
     }
 
@@ -26,7 +27,7 @@ Shader::Shader(const char* vertexShaderPath, const char* fragmentShaderPath) {
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(fragmentShader, 512, NULL, info);
-        fprintf(stderr, "Fragment shader compilation failed with error: %s\n", info);
+        LOG_ERROR("Fragment shader compilation failed with error: {}", info);
         exit(EXIT_FAILURE);
     }
 
@@ -39,7 +40,7 @@ Shader::Shader(const char* vertexShaderPath, const char* fragmentShaderPath) {
     glGetProgramiv(m_ProgramId, GL_LINK_STATUS, &success);
     if (!success) {
         glGetProgramInfoLog(m_ProgramId, 512, NULL, info);
-        fprintf(stderr, "Shader linking failed with error: %s\n", info);
+        LOG_ERROR("Shader linking failed with error: {}", info);
         exit(EXIT_FAILURE);
     }
     glDeleteShader(vertexShader);
@@ -61,7 +62,7 @@ GLint Shader::GetUniformLocation(const char* name)
 
 	GLint location = glGetUniformLocation(m_ProgramId, name);
 	if (location == -1) {
-		fprintf(stderr, "ERROR: Uniform '%s' location not found.\n", name);
+		LOG_ERROR("Uniform '{}' location not found.", name);
         exit(EXIT_FAILURE);
     }
 	m_UniformLocationCache[name] = location;
