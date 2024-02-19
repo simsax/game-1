@@ -216,7 +216,7 @@ int main() {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE); 
 	glEnable(GL_LINE_SMOOTH);
-	glLineWidth(2);
+	glLineWidth(1);
     // v sync (disable when profiling performance)
     SDL_GL_SetSwapInterval(1); // read the docs (can be 0, 1, -1)
 
@@ -426,7 +426,7 @@ int main() {
     float rotationSpeed = 10.0f;
     float t = 0.0f;
     Rotation rotation;
-    bool editorMode = false; // maybe this will turn into an enum
+    bool editorMode = true; // maybe this will turn into an enum
     double deltaTime = 0; // time between current and last frame
     double lastTime = 0; // time of last frame
     double prevTime = 0; // start time of the current second

@@ -255,13 +255,10 @@ void Camera<T>::Pan(int xoffset, int yoffset) {
 template <CameraType T>
 void Camera<T>::Zoom(int verticalScroll) {
     if constexpr (T == CameraType::PERSPECTIVE) {
-        m_CurrentFov -= verticalScroll;
+        static constexpr float zoomSpeed = 1.0f;
+        float distance = verticalScroll * zoomSpeed;
 
-        // constrain fov
-        if (m_CurrentFov < 1.0f)
-            m_CurrentFov = 1.0f;
-
-        m_Projection = glm::perspective(glm::radians(m_CurrentFov), m_AspectRatio, m_Znear, m_Zfar);
+        m_CameraPos += m_CameraFront * distance;
     } else {
         m_Zoom -= verticalScroll;
         m_Projection = glm::ortho(-m_AspectRatio*m_Zoom/2, m_AspectRatio*m_Zoom/2, -m_Zoom/2,
