@@ -187,11 +187,6 @@ int main() {
         SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN
     ));
 
-    // hide mouse and keep it inside the window
-#if !ORTHO
-    SDL_SetRelativeMouseMode(SDL_TRUE);
-#endif
-
     SDL_GLContext context = SDL(SDL_GL_CreateContext(window));
 
     gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress);
@@ -392,28 +387,10 @@ int main() {
 
     // some globals (outside the game loop)
     bool quit = false;
-    bool mouseCaptured = false;
-    CameraType cameraType = CameraType::ORTHOGRAPHIC;
-    static constexpr float zoom = 10.0f;
-    static constexpr glm::vec3 orthoPos = glm::vec3(-20.0f, 20.0f,  20.0f);
-    static const glm::vec3 orthoFront = - glm::normalize(orthoPos);
-    Camera orthoCam = Camera<CameraType::ORTHOGRAPHIC>(
-            SCREEN_WIDTH, SCREEN_HEIGHT, 0.1f, 100.0f,
-            orthoPos,
-            orthoFront,
-            glm::vec3(0.0f, 1.0f, 0.0f),
-            10.0f,
-            70.0f,
-            0.1f,
-            zoom);
-    Camera perspectiveCam = Camera<CameraType::PERSPECTIVE>(
-            SCREEN_WIDTH, SCREEN_HEIGHT, 0.1f, 100.0f,
-            glm::vec3(0.0f, 0.0f,  3.0f),
-            glm::vec3(0.0f, 0.0f, -1.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f),
-            10.0f,
-            70.0f,
-            0.1f);
+    static constexpr glm::vec3 cameraPos = glm::vec3(-20.0f, 20.0f,  20.0f);
+    static const glm::vec3 cameraFront = - glm::normalize(cameraPos);
+    Camera camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT, 0.1f, 100.0f, cameraPos, cameraFront,
+            glm::vec3(0.0f, 1.0f, 0.0f), 10.0f, 70.0f, 0.1f, 40.0f);
     glm::vec3 pos = glm::vec3(0.0f);
     glm::vec3 absoluteTrans = glm::vec3(0.5f);
     glm::mat4 model = glm::translate(glm::mat4(1.0f), absoluteTrans);
@@ -448,36 +425,30 @@ int main() {
                             quit = true;
                             break;
                         case SDLK_w:
-                            if (cameraType == CameraType::PERSPECTIVE)
-                                perspectiveCam.Move(Direction::FORWARD);
+                            if (camera.GetType() == CameraType::PERSPECTIVE)
+                                camera.Move(Direction::FORWARD);
                             else
-                                orthoCam.Move(Direction::UP);
+                                camera.Move(Direction::UP);
                             break;
                         case SDLK_a:
-                            if (cameraType == CameraType::PERSPECTIVE)
-                                perspectiveCam.Move(Direction::LEFT);
-                            else
-                                orthoCam.Move(Direction::LEFT);
+                            camera.Move(Direction::LEFT);
                             break;
                         case SDLK_s:
-                            if (cameraType == CameraType::PERSPECTIVE)
-                                perspectiveCam.Move(Direction::BACKWARDS);
+                            if (camera.GetType() == CameraType::PERSPECTIVE)
+                                camera.Move(Direction::BACKWARDS);
                             else
-                                orthoCam.Move(Direction::DOWN);
+                                camera.Move(Direction::DOWN);
                             break;
                         case SDLK_d:
-                            if (cameraType == CameraType::PERSPECTIVE)
-                                perspectiveCam.Move(Direction::RIGHT);
-                            else
-                                orthoCam.Move(Direction::RIGHT);
+                            camera.Move(Direction::RIGHT);
                             break;
                         case SDLK_SPACE:
-                            if (cameraType == CameraType::PERSPECTIVE)
-                                perspectiveCam.Move(Direction::UP);
+                            if (camera.GetType() == CameraType::PERSPECTIVE)
+                                camera.Move(Direction::UP);
                             break;
                         case SDLK_LCTRL:
-                            if (cameraType == CameraType::PERSPECTIVE)
-                                perspectiveCam.Move(Direction::DOWN);
+                            if (camera.GetType() == CameraType::PERSPECTIVE)
+                                camera.Move(Direction::DOWN);
                             break;
                         case SDLK_DOWN:
                             if (!rotating) {
@@ -533,51 +504,36 @@ int main() {
                 case SDL_KEYUP:
                     switch (event.key.keysym.sym) {
                         case SDLK_w:
-                            if (cameraType == CameraType::PERSPECTIVE)
-                                perspectiveCam.Stop(Direction::FORWARD);
+                            if (camera.GetType() == CameraType::PERSPECTIVE)
+                                camera.Stop(Direction::FORWARD);
                             else
-                                orthoCam.Stop(Direction::UP);
+                                camera.Stop(Direction::UP);
                             break;
                         case SDLK_a:
-                            if (cameraType == CameraType::PERSPECTIVE)
-                                perspectiveCam.Stop(Direction::LEFT);
-                            else
-                                orthoCam.Stop(Direction::LEFT);
+                            camera.Stop(Direction::LEFT);
                             break;
                         case SDLK_s:
-                            if (cameraType == CameraType::PERSPECTIVE)
-                                perspectiveCam.Stop(Direction::BACKWARDS);
+                            if (camera.GetType() == CameraType::PERSPECTIVE)
+                                camera.Stop(Direction::BACKWARDS);
                             else
-                                orthoCam.Stop(Direction::DOWN);
+                                camera.Stop(Direction::DOWN);
                             break;
                         case SDLK_d:
-                            if (cameraType == CameraType::PERSPECTIVE)
-                                perspectiveCam.Stop(Direction::RIGHT);
-                            else
-                                orthoCam.Stop(Direction::RIGHT);
+                            camera.Stop(Direction::RIGHT);
                             break;
                         case SDLK_SPACE:
-                            if (cameraType == CameraType::PERSPECTIVE)
-                                perspectiveCam.Stop(Direction::UP);
+                            if (camera.GetType() == CameraType::PERSPECTIVE)
+                                camera.Stop(Direction::UP);
                             break;
                         case SDLK_LCTRL:
-                            if (cameraType == CameraType::PERSPECTIVE)
-                                perspectiveCam.Stop(Direction::DOWN);
+                            if (camera.GetType() == CameraType::PERSPECTIVE)
+                                camera.Stop(Direction::DOWN);
                             break;
                         case SDLK_m:
-                            mouseCaptured = !mouseCaptured;
+                            camera.FlipMode();
                             break;
                         case SDLK_c:
-                            {
-                                cameraType = cameraType == CameraType::PERSPECTIVE ?
-                                    CameraType::ORTHOGRAPHIC : CameraType::PERSPECTIVE;
-
-                                // uncapture mouse by default when in ortographic mode
-                                if (cameraType == CameraType::ORTHOGRAPHIC)
-                                    mouseCaptured = false;
-                                else
-                                    mouseCaptured = true;
-                            }
+                            camera.FlipType();
                             break;
                         case SDLK_e:
                             editorMode = !editorMode;
@@ -615,53 +571,26 @@ int main() {
                         // retrieve x and y offset from mouse movement
                         int xoffset = event.motion.xrel;
                         int yoffset = -event.motion.yrel; // down is 1 for SDL but -1 for OpenGL coords
-                        if (cameraType == CameraType::PERSPECTIVE) {
-                            if (mouseCaptured) {
-                                perspectiveCam.Turn(xoffset, yoffset);
-                            }
-                            else {
-                                if (wheelPressed) {
-                                    if (shiftPressed) {
-                                        // pan
-                                        perspectiveCam.Pan(xoffset, yoffset);
-                                    } else {
-                                        // turn
-                                        perspectiveCam.Orbit(xoffset, yoffset);
-                                    }
-                                }
-                            }
-                        } else { // orthographic
+                        if (camera.GetMode() == CameraMode::FLY) {
+                            camera.Turn(xoffset, yoffset);
+                        } else {
                             if (wheelPressed) {
                                 if (shiftPressed) {
-                                    // pan
-                                    orthoCam.Pan(xoffset, yoffset);
+                                    camera.Pan(xoffset, yoffset);
                                 } else {
-                                    // turn
-                                    /* orthoCam.Turn(xoffset, yoffset); */
-                                    glm::vec3 target = glm::vec3(0);
-                                    orthoCam.Orbit(xoffset, yoffset);
+                                    camera.Orbit(xoffset, yoffset);
                                 }
                             }
                         }
                     }
                     break;
                 case SDL_MOUSEWHEEL:
-                    {
-                        if (cameraType == CameraType::PERSPECTIVE)
-                            perspectiveCam.Zoom(event.wheel.y);
-                        else
-                            orthoCam.Zoom(event.wheel.y);
-                    }
+                    camera.Zoom(event.wheel.y);
                     break;
                 default:
                     break;
             }
         }
-
-        if (mouseCaptured)
-            SDL_SetRelativeMouseMode(SDL_TRUE);
-        else
-            SDL_SetRelativeMouseMode(SDL_FALSE);
 
         // update
         double time = SDL_GetTicks() / 1000.0;
@@ -675,15 +604,11 @@ int main() {
             prevTime = lastTime;
         }
 
-        // camera update
-        if (cameraType == CameraType::PERSPECTIVE)
-            perspectiveCam.Update(deltaTime);
-        else
-            orthoCam.Update(deltaTime);
+        camera.Update(deltaTime);
 
         // raycast
         bool tileIsCasted = false;
-        if (editorMode && !mouseCaptured) {
+        if (editorMode && camera.GetMode() == CameraMode::ORBIT) {
             int x, y;
             uint32_t mouseState = SDL_GetMouseState(&x, &y);
             glm::vec4 ndcHomo = glm::vec4(
@@ -694,24 +619,24 @@ int main() {
             glm::vec3 rayWorld;
             glm::vec3 cameraPos;
 
-            if (cameraType == CameraType::PERSPECTIVE) {
-                rayEye = glm::inverse(perspectiveCam.GetProjection()) * ndcHomo;
+            if (camera.GetType() == CameraType::PERSPECTIVE) {
+                rayEye = glm::inverse(camera.GetPerspectiveProjection()) * ndcHomo;
                 rayEye.z = -1.0f;
                 rayEye.w = 0.0f;
 
                 /* glm::vec4 rayWorld4 = glm::inverse(view) * rayEye; */
                 /* rayWorld = glm::normalize(glm::vec3(rayWorld4.x, rayWorld4.y, rayWorld4.z)); */
-                rayWorld = glm::normalize(glm::inverse(perspectiveCam.GetView()) * rayEye);
-                cameraPos = perspectiveCam.GetPos();
+                rayWorld = glm::normalize(glm::inverse(camera.GetView()) * rayEye);
+                cameraPos = camera.GetPos();
             } else {
-                float xOrthoOffset = ndcHomo.x * orthoCam.GetOrthoWidth() / 2;
-                float yOrthoOffset = ndcHomo.y * orthoCam.GetOrthoHeight() / 2;
+                float xOrthoOffset = ndcHomo.x * camera.GetOrthoWidth() / 2;
+                float yOrthoOffset = ndcHomo.y * camera.GetOrthoHeight() / 2;
 
                 // For orthographic projection, the ray direction is constant and does not depend on the mouse position.
-                rayWorld = orthoCam.GetFront();
-                glm::vec3 right = glm::normalize(glm::cross(orthoCam.GetFront(), orthoCam.GetUp()));
-                glm::vec3 up = glm::normalize(glm::cross(right, orthoCam.GetFront()));
-                cameraPos = orthoCam.GetPos() + right * xOrthoOffset + up * yOrthoOffset;
+                rayWorld = camera.GetFront();
+                glm::vec3 right = glm::normalize(glm::cross(camera.GetFront(), camera.GetUp()));
+                glm::vec3 up = glm::normalize(glm::cross(right, camera.GetFront()));
+                cameraPos = camera.GetPos() + right * xOrthoOffset + up * yOrthoOffset;
             }
             float dot = glm::dot(rayWorld, planeNormal);
             if (dot >= 0.0f) {
@@ -732,8 +657,6 @@ int main() {
                 }
             }
         }
-
-        // update color only when hovered tile changes, not every frame
 
         // render
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -781,11 +704,10 @@ int main() {
             }
         }
 
-        const glm::mat4& projection = cameraType == CameraType::PERSPECTIVE ? perspectiveCam.GetProjection()
-            : orthoCam.GetProjection();
+        const glm::mat4& projection = camera.GetType() == CameraType::PERSPECTIVE ?
+            camera.GetPerspectiveProjection() : camera.GetOrthographicProjection();
 
-        const glm::mat4& view = cameraType == CameraType::PERSPECTIVE ? perspectiveCam.GetView()
-            : orthoCam.GetView();
+        const glm::mat4& view = camera.GetView();
 
         glm::mat4 vp = projection * view;
     
@@ -833,7 +755,6 @@ int main() {
             }
 
         }
-
 
         SDL_GL_SwapWindow(window);
     }
