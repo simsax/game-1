@@ -735,14 +735,15 @@ int main() {
             editorTilesShader.Bind();
             editorTilesShader.SetUniformMatrix4fv("mvp", vp);
 
+            // render tiles
             editorTilesMesh.BindVao();
+            glLineWidth(1);
             glDrawElements(GL_LINES, editorTilesMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
 
             // render axis
             axisLinesMesh.BindVao();
             glLineWidth(4);
             glDrawArrays(GL_LINES, 0, axisLinesMesh.GetNumVertices());
-            glLineWidth(2);
 
             // render raycasted tile
             if (tileIsCasted) {
@@ -750,7 +751,6 @@ int main() {
                 glLineWidth(8);
                 glDisable(GL_DEPTH_TEST);
                 glDrawArrays(GL_LINE_LOOP, 0, castedTileMesh.GetNumVertices());
-                glLineWidth(2);
                 glEnable(GL_DEPTH_TEST);
             }
 
