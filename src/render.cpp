@@ -1,5 +1,13 @@
 #include "render.h"
 
+glm::vec3 hexToRgb(uint32_t color) {
+    return {
+        ((color >> 16) & 0xFF) / 255.0f,
+        ((color >> 8) & 0xFF)  / 255.0f,
+        ((color >> 0) & 0xFF)  / 255.0f,
+    };
+}
+
 std::vector<uint32_t> generateQuadIndices(size_t numQuads) {
     const size_t numVertices = numQuads * 4;
     const size_t numIndices = numQuads * 6;

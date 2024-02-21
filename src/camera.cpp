@@ -117,10 +117,19 @@ void Camera::Pan(int xoffset, int yoffset) {
 
 void Camera::Zoom(int verticalScroll) {
     if (m_Type == CameraType::PERSPECTIVE) {
-        static constexpr float zoomSpeed = 1.0f;
-        float distance = verticalScroll * zoomSpeed;
+        /* static constexpr float zoomSpeed = 1.0f; */
+        /* float distance = verticalScroll * zoomSpeed; */
 
-        m_CameraPos += m_CameraFront * distance;
+        /* m_CameraPos += m_CameraFront * distance; */
+        m_CurrentFov -= verticalScroll;
+
+        // constrain fov
+        if (m_CurrentFov < 1.0f)
+            m_CurrentFov = 1.0f;
+        /* if (m_CurrentFov > m_BaseFov) */
+        /*     m_CurrentFov = m_BaseFov; */
+
+        m_Perspective = glm::perspective(glm::radians(m_CurrentFov), m_AspectRatio, m_Znear, m_Zfar);
     } else {
         m_Zoom -= verticalScroll;
         m_Orthographic = glm::ortho(-m_AspectRatio*m_Zoom/2, m_AspectRatio*m_Zoom/2, -m_Zoom/2,

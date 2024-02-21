@@ -276,13 +276,14 @@ int main() {
     editorTilesVector.reserve(numTilesEditor);
 
     static constexpr int offset = sideNumEditor / 2;
+    const glm::vec3 lineColor = glm::vec3(0.5);
     for (int z = 0; z < sideNumEditor; z++) {
         for (int x = 0; x < sideNumEditor; x++) {
             editorTilesVector.push_back({
-                    EditorVertex{glm::vec3(x - offset, 0.0f, z - offset), glm::vec3(1.0f)},
-                    EditorVertex{glm::vec3(x + 1 - offset, 0.0f, z - offset), glm::vec3(1.0f)},
-                    EditorVertex{glm::vec3(x + 1 - offset, 0.0f, z + 1 - offset), glm::vec3(1.0f)},
-                    EditorVertex{glm::vec3(x - offset, 0.0f, z + 1 - offset), glm::vec3(1.0f)}
+                    EditorVertex{glm::vec3(x - offset, 0.0f, z - offset), lineColor},
+                    EditorVertex{glm::vec3(x + 1 - offset, 0.0f, z - offset), lineColor},
+                    EditorVertex{glm::vec3(x + 1 - offset, 0.0f, z + 1 - offset), lineColor},
+                    EditorVertex{glm::vec3(x - offset, 0.0f, z + 1 - offset), lineColor}
             });
         }
     }
@@ -299,18 +300,22 @@ int main() {
     };
 
     static constexpr float halfLength = 1000.0f;
+    glm::vec3 axisRed = hexToRgb(AXIS_RED);
+    glm::vec3 axisGreen = hexToRgb(AXIS_GREEN);
+    glm::vec3 axisBlue = hexToRgb(AXIS_BLUE);
+
     std::vector<LineVertex> axisLines = {
         LineVertex({
-                EditorVertex{glm::vec3(-halfLength, 0, 0), glm::vec3(1,0,0)},
-                EditorVertex{glm::vec3(halfLength, 0, 0), glm::vec3(1,0,0)},
+                EditorVertex{glm::vec3(-halfLength, 0, 0), axisRed},
+                EditorVertex{glm::vec3(halfLength, 0, 0), axisRed},
                 }),
         LineVertex({
-                EditorVertex{glm::vec3(0, -halfLength, 0), glm::vec3(0,1,0)},
-                EditorVertex{glm::vec3(0, halfLength, 0), glm::vec3(0,1,0)},
+                EditorVertex{glm::vec3(0, 0, -halfLength), axisBlue},
+                EditorVertex{glm::vec3(0, 0, halfLength), axisBlue},
                 }),
         LineVertex({
-                EditorVertex{glm::vec3(0, 0, -halfLength), glm::vec3(0,0,1)},
-                EditorVertex{glm::vec3(0, 0, halfLength), glm::vec3(0,0,1)},
+                EditorVertex{glm::vec3(0, -halfLength, 0), axisGreen},
+                EditorVertex{glm::vec3(0, halfLength, 0), axisGreen},
                 }),
     };
 
@@ -385,12 +390,18 @@ int main() {
             ABS_PATH("/res/shaders/editorTileShader.vert"),
             ABS_PATH("/res/shaders/editorTileShader.frag"));
 
+    Shader axisShader = Shader(
+            ABS_PATH("/res/shaders/axisShader.vert"),
+            ABS_PATH("/res/shaders/editorTileShader.frag"));
+
     // some globals (outside the game loop)
     bool quit = false;
-    static constexpr glm::vec3 cameraPos = glm::vec3(-20.0f, 20.0f,  20.0f);
+    static constexpr glm::vec3 cameraPos = glm::vec3(-50.0f, 50.0f, 50.0f);
     static const glm::vec3 cameraFront = - glm::normalize(cameraPos);
-    Camera camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT, 0.1f, 100.0f, cameraPos, cameraFront,
-            glm::vec3(0.0f, 1.0f, 0.0f), 10.0f, 70.0f, 0.1f, 40.0f);
+    // with such a small fov, perspective starts to look like an ortrographic projection 
+    // since lines are almost parallel
+    Camera camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT, 0.1f, 10000.0f, cameraPos, cameraFront,
+            glm::vec3(0.0f, 1.0f, 0.0f), 10.0f, 10.0f, 0.1f, 20.0f);
     glm::vec3 pos = glm::vec3(0.0f);
     glm::vec3 absoluteTrans = glm::vec3(0.5f);
     glm::mat4 model = glm::translate(glm::mat4(1.0f), absoluteTrans);
@@ -410,6 +421,8 @@ int main() {
     int numFrames = 0;
     bool wheelPressed = false;
     bool shiftPressed = false;
+    glm::vec3 axisOffset = glm::vec3(0);
+    const glm::vec3 tileColor = hexToRgb(CAST_TILE);
 
     // game loop
     while(!quit) {
@@ -652,14 +665,18 @@ int main() {
                 if (tileX >= 0 && tileZ >= 0 && tileX < sideNumEditor && tileZ < sideNumEditor) {
                     tileIsCasted = true;
                     castedTile = editorTilesVector[tileIx];
-                    castedTile.SetColor(glm::vec3(0, 1, 0));
+                    castedTile.SetColor(tileColor);
                     castedTileMesh.UpdateBufferData(0, sizeof(EditorTile), &castedTile);
                 }
             }
         }
 
+        glm::vec3 normalizedCameraPos = glm::normalize(camera.GetPos());
+        axisOffset = 0.1f * normalizedCameraPos;
+
         // render
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        const glm::vec3 background = hexToRgb(BG_COLOR);
+        glClearColor(background.x, background.y, background.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (rotating) {
@@ -740,20 +757,22 @@ int main() {
             glLineWidth(1);
             glDrawElements(GL_LINES, editorTilesMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
 
-            // render axis
-            axisLinesMesh.BindVao();
-            glLineWidth(4);
-            glDrawArrays(GL_LINES, 0, axisLinesMesh.GetNumVertices());
-
             // render raycasted tile
             if (tileIsCasted) {
                 castedTileMesh.BindVao();
-                glLineWidth(8);
+                glLineWidth(4);
                 glDisable(GL_DEPTH_TEST);
                 glDrawArrays(GL_LINE_LOOP, 0, castedTileMesh.GetNumVertices());
                 glEnable(GL_DEPTH_TEST);
             }
 
+            // render axis
+            axisShader.Bind();
+            axisShader.SetUniformMatrix4fv("mvp", vp);
+            axisShader.SetUniform3f("axisOffset", axisOffset.x, axisOffset.y, axisOffset.z);
+            axisLinesMesh.BindVao();
+            glLineWidth(2);
+            glDrawArrays(GL_LINES, 0, axisLinesMesh.GetNumVertices() - LineVertex::numVertices);
         }
 
         SDL_GL_SwapWindow(window);
