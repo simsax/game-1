@@ -33,7 +33,10 @@ else()
     find_package(SDL2 REQUIRED CONFIG COMPONENTS SDL2main)
 endif()
 
+file(GLOB IMGUI_SOURCES "extern/imgui/*.cpp")
+
 add_executable(${PROJECT_NAME}
+    ${IMGUI_SOURCES}
     src/main.cpp
     src/utils.cpp
     src/shader.cpp
@@ -49,7 +52,7 @@ target_include_directories(${PROJECT_NAME}
         PUBLIC ${CMAKE_BINARY_DIR}
         PUBLIC ${PROJECT_SOURCE_DIR}/extern/stb_image
         PUBLIC ${PROJECT_SOURCE_DIR}/extern/glm
-        # ${PROJECT_SOURCE_DIR}/extern/glad/include
+        PUBLIC ${PROJECT_SOURCE_DIR}/extern/imgui
 )
 
 # SDL2::SDL2main may or may not be available. It is e.g. required by Windows GUI applications
