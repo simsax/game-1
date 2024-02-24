@@ -219,6 +219,21 @@ int main() {
     // v sync (disable when profiling performance)
     SDL_GL_SetSwapInterval(1); // read the docs (can be 0, 1, -1)
 
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    /* io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls */
+    /* io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls */
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // IF using Docking Branch
+
+    io.Fonts->AddFontFromFileTTF(ABS_PATH("/res/fonts/UbuntuMonoNerdFont-Regular.ttf"), 16);
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplSDL2_InitForOpenGL(window, &context);
+    ImGui_ImplOpenGL3_Init();
+
+
     std::vector<Vertex> cubeVertices = {
         // up
         {glm::vec3(0.5f,  0.5f,  0.5f),  glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 1.0f)},
@@ -427,11 +442,14 @@ int main() {
     bool shiftPressed = false;
     glm::vec3 axisOffset = glm::vec3(0);
     const glm::vec3 tileColor = hexToRgb(CAST_TILE);
+    bool mouseOnUI = false;
 
     // game loop
     while(!quit) {
+        mouseOnUI = io.WantCaptureMouse;
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            ImGui_ImplSDL2_ProcessEvent(&event); // Forward your event to backend
             switch(event.type) {
                 case SDL_QUIT:
                     quit = true;
@@ -562,29 +580,21 @@ int main() {
                     }
                     break;
                 case SDL_MOUSEBUTTONDOWN:
-                    /* if (event.button.button == SDL_BUTTON_LEFT) { */
-                    /*     mouse_down(LEFT_BUTTON); */
-                    /*     drag(); */
-                    /* } else if (event.button.button == SDL_BUTTON_RIGHT) { */
-                    /*     mouse_down(RIGHT_BUTTON); */
-                    /* } */
-                    if (event.button.button == SDL_BUTTON_MIDDLE) {
-                        wheelPressed = true;
+                    if (!mouseOnUI) {
+                        if (event.button.button == SDL_BUTTON_MIDDLE) {
+                            wheelPressed = true;
+                        }
                     }
                     break;
                 case SDL_MOUSEBUTTONUP:
-                    /* if (event.button.button == SDL_BUTTON_LEFT) { */
-                    /*     mouse_up(LEFT_BUTTON); */
-                    /*     undrag(); */
-                    /* } else if (event.button.button == SDL_BUTTON_RIGHT) { */
-                    /*     mouse_up(RIGHT_BUTTON); */
-                    /* } */
-                    if (event.button.button == SDL_BUTTON_MIDDLE) {
-                        wheelPressed = false;
+                    if (!mouseOnUI) {
+                        if (event.button.button == SDL_BUTTON_MIDDLE) {
+                            wheelPressed = false;
+                        }
                     }
                     break;
                 case SDL_MOUSEMOTION:
-                    {
+                    if (!mouseOnUI) {
                         // retrieve x and y offset from mouse movement
                         int xoffset = event.motion.xrel;
                         int yoffset = -event.motion.yrel; // down is 1 for SDL but -1 for OpenGL coords
@@ -602,12 +612,19 @@ int main() {
                     }
                     break;
                 case SDL_MOUSEWHEEL:
-                    camera.Zoom(event.wheel.y);
+                    if (!mouseOnUI) {
+                        camera.Zoom(event.wheel.y);
+                    }
                     break;
                 default:
                     break;
             }
         }
+        // Start the Dear ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
+        ImGui::ShowDemoWindow(); // Show demo window! :)
 
         // update
         double time = SDL_GetTicks() / 1000.0;
@@ -625,52 +642,54 @@ int main() {
 
         // raycast
         bool tileIsCasted = false;
-        if (editorMode && camera.GetMode() == CameraMode::ORBIT) {
-            int x, y;
-            uint32_t mouseState = SDL_GetMouseState(&x, &y);
-            glm::vec4 ndcHomo = glm::vec4(
-                    2.0f * x / SCREEN_WIDTH - 1.0f, -2.0f * y / SCREEN_HEIGHT + 1.0f, -1.0f, 1.0f);
+        if (!mouseOnUI) {
+            if (editorMode && camera.GetMode() == CameraMode::ORBIT) {
+                int x, y;
+                uint32_t mouseState = SDL_GetMouseState(&x, &y);
+                glm::vec4 ndcHomo = glm::vec4(
+                        2.0f * x / SCREEN_WIDTH - 1.0f, -2.0f * y / SCREEN_HEIGHT + 1.0f, -1.0f, 1.0f);
 
-            glm::vec4 rayEye;
-            glm::vec3 planeNormal = glm::vec3(0.0f, -1.0f, 0.0f);
-            glm::vec3 rayWorld;
-            glm::vec3 cameraPos;
+                glm::vec4 rayEye;
+                glm::vec3 planeNormal = glm::vec3(0.0f, -1.0f, 0.0f);
+                glm::vec3 rayWorld;
+                glm::vec3 cameraPos;
 
-            if (camera.GetType() == CameraType::PERSPECTIVE) {
-                rayEye = glm::inverse(camera.GetPerspectiveProjection()) * ndcHomo;
-                rayEye.z = -1.0f;
-                rayEye.w = 0.0f;
+                if (camera.GetType() == CameraType::PERSPECTIVE) {
+                    rayEye = glm::inverse(camera.GetPerspectiveProjection()) * ndcHomo;
+                    rayEye.z = -1.0f;
+                    rayEye.w = 0.0f;
 
-                /* glm::vec4 rayWorld4 = glm::inverse(view) * rayEye; */
-                /* rayWorld = glm::normalize(glm::vec3(rayWorld4.x, rayWorld4.y, rayWorld4.z)); */
-                rayWorld = glm::normalize(glm::inverse(camera.GetView()) * rayEye);
-                cameraPos = camera.GetPos();
-            } else {
-                float xOrthoOffset = ndcHomo.x * camera.GetOrthoWidth() / 2;
-                float yOrthoOffset = ndcHomo.y * camera.GetOrthoHeight() / 2;
+                    /* glm::vec4 rayWorld4 = glm::inverse(view) * rayEye; */
+                    /* rayWorld = glm::normalize(glm::vec3(rayWorld4.x, rayWorld4.y, rayWorld4.z)); */
+                    rayWorld = glm::normalize(glm::inverse(camera.GetView()) * rayEye);
+                    cameraPos = camera.GetPos();
+                } else {
+                    float xOrthoOffset = ndcHomo.x * camera.GetOrthoWidth() / 2;
+                    float yOrthoOffset = ndcHomo.y * camera.GetOrthoHeight() / 2;
 
-                // For orthographic projection, the ray direction is constant and does not depend on the mouse position.
-                rayWorld = camera.GetFront();
-                glm::vec3 right = glm::normalize(glm::cross(camera.GetFront(), camera.GetUp()));
-                glm::vec3 up = glm::normalize(glm::cross(right, camera.GetFront()));
-                cameraPos = camera.GetPos() + right * xOrthoOffset + up * yOrthoOffset;
-            }
-            float dot = glm::dot(rayWorld, planeNormal);
-            if (dot >= 0.0f) {
-                float t = cameraPos.y / dot;
-                glm::vec3 raycastedPoint = cameraPos + rayWorld * t;
+                    // For orthographic projection, the ray direction is constant and does not depend on the mouse position.
+                    rayWorld = camera.GetFront();
+                    glm::vec3 right = glm::normalize(glm::cross(camera.GetFront(), camera.GetUp()));
+                    glm::vec3 up = glm::normalize(glm::cross(right, camera.GetFront()));
+                    cameraPos = camera.GetPos() + right * xOrthoOffset + up * yOrthoOffset;
+                }
+                float dot = glm::dot(rayWorld, planeNormal);
+                if (dot >= 0.0f) {
+                    float t = cameraPos.y / dot;
+                    glm::vec3 raycastedPoint = cameraPos + rayWorld * t;
 
-                int tileX = floor(raycastedPoint.x);
-                int tileZ = floor(raycastedPoint.z);
-                tileX += offset;
-                tileZ += offset;
+                    int tileX = floor(raycastedPoint.x);
+                    int tileZ = floor(raycastedPoint.z);
+                    tileX += offset;
+                    tileZ += offset;
 
-                int tileIx = tileZ * sideNumEditor + tileX;
-                if (tileX >= 0 && tileZ >= 0 && tileX < sideNumEditor && tileZ < sideNumEditor) {
-                    tileIsCasted = true;
-                    castedTile = editorTilesVector[tileIx];
-                    castedTile.SetColor(tileColor);
-                    castedTileMesh.UpdateBufferData(0, sizeof(EditorTile), &castedTile);
+                    int tileIx = tileZ * sideNumEditor + tileX;
+                    if (tileX >= 0 && tileZ >= 0 && tileX < sideNumEditor && tileZ < sideNumEditor) {
+                        tileIsCasted = true;
+                        castedTile = editorTilesVector[tileIx];
+                        castedTile.SetColor(tileColor);
+                        castedTileMesh.UpdateBufferData(0, sizeof(EditorTile), &castedTile);
+                    }
                 }
             }
         }
@@ -779,8 +798,15 @@ int main() {
             glDrawArrays(GL_LINES, 0, axisLinesMesh.GetNumVertices() - LineVertex::numVertices);
         }
 
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
     }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
 
     SDL_GL_DeleteContext(context);
     SDL_DestroyWindow(window);
