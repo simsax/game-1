@@ -273,6 +273,7 @@ int main() {
     };
 
 
+    // level tiles
     static constexpr int sideNum = 3;
     static constexpr int numTiles = sideNum * sideNum;
     std::vector<Tile> tilesVector;
@@ -289,6 +290,7 @@ int main() {
         }
     }
 
+    // editor tiles
     static constexpr int sideNumEditor = 100;
     static constexpr int numTilesEditor = sideNumEditor * sideNumEditor;
     std::vector<EditorTile> editorTilesVector;
@@ -316,6 +318,13 @@ int main() {
         EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
         EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
         EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
+    };
+
+    EditorTile selectedTile = {
+        EditorVertex{glm::vec3(0, 0, 0), hexToRgb(SELECT_TILE)},
+        EditorVertex{glm::vec3(1, 0, 0), hexToRgb(SELECT_TILE)},
+        EditorVertex{glm::vec3(1, 0, 1), hexToRgb(SELECT_TILE)},
+        EditorVertex{glm::vec3(0, 0, 1), hexToRgb(SELECT_TILE)},
     };
 
     static constexpr float halfLength = 1000.0f;
@@ -378,6 +387,7 @@ int main() {
 
 
     Mesh castedTileMesh = Mesh(&castedTile, EditorTile::numVertices, sizeof(EditorTile), tilesLayout, GL_DYNAMIC_DRAW);
+    Mesh selectedTileMesh = Mesh(&selectedTile, EditorTile::numVertices, sizeof(EditorTile), tilesLayout, GL_DYNAMIC_DRAW);
 
     Mesh editorTilesMesh = Mesh(
             editorTilesVector.data(),
@@ -407,6 +417,10 @@ int main() {
 
     Shader editorTilesShader = Shader(
             ABS_PATH("/res/shaders/editorTileShader.vert"),
+            ABS_PATH("/res/shaders/editorTileShader.frag"));
+
+    Shader selectedTilesShader = Shader(
+            ABS_PATH("/res/shaders/selectedTileShader.vert"),
             ABS_PATH("/res/shaders/editorTileShader.frag"));
 
     Shader axisShader = Shader(
@@ -443,6 +457,8 @@ int main() {
     glm::vec3 axisOffset = glm::vec3(0);
     const glm::vec3 tileColor = hexToRgb(CAST_TILE);
     bool mouseOnUI = false;
+    bool tileIsCasted = false;
+    int castedTileIndex = -1;
 
     // game loop
     while(!quit) {
@@ -581,8 +597,22 @@ int main() {
                     break;
                 case SDL_MOUSEBUTTONDOWN:
                     if (!mouseOnUI) {
-                        if (event.button.button == SDL_BUTTON_MIDDLE) {
-                            wheelPressed = true;
+                        switch (event.button.button) {
+                            case SDL_BUTTON_LEFT:
+                                if (tileIsCasted) {
+                                    /* editorTilesVector[castedTileIndex]. */
+                                }
+                                break;
+                            case SDL_BUTTON_RIGHT:
+                                if (tileIsCasted) {
+                                    /* std::erase(selectedTiles, castedTileIndex); */
+                                }
+                                break;
+                            case SDL_BUTTON_MIDDLE:
+                                wheelPressed = true;
+                                break;
+                            default:
+                                break;
                         }
                     }
                     break;
@@ -624,7 +654,6 @@ int main() {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
-        ImGui::ShowDemoWindow(); // Show demo window! :)
 
         // update
         double time = SDL_GetTicks() / 1000.0;
@@ -641,7 +670,7 @@ int main() {
         camera.Update(deltaTime);
 
         // raycast
-        bool tileIsCasted = false;
+        tileIsCasted = false;
         if (!mouseOnUI) {
             if (editorMode && camera.GetMode() == CameraMode::ORBIT) {
                 int x, y;
@@ -686,6 +715,7 @@ int main() {
                     int tileIx = tileZ * sideNumEditor + tileX;
                     if (tileX >= 0 && tileZ >= 0 && tileX < sideNumEditor && tileZ < sideNumEditor) {
                         tileIsCasted = true;
+                        castedTileIndex = tileIx;
                         castedTile = editorTilesVector[tileIx];
                         castedTile.SetColor(tileColor);
                         castedTileMesh.UpdateBufferData(0, sizeof(EditorTile), &castedTile);
@@ -701,6 +731,13 @@ int main() {
         const glm::vec3 background = hexToRgb(BG_COLOR);
         glClearColor(background.x, background.y, background.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // imgui dockspace
+        /* ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()); */
+        ImGui::ShowDemoWindow(); // Show demo window! :)
+
+        /* ImGui::Begin("Viewport"); */
+        /* ImGui::End(); */
 
         if (rotating) {
             t += deltaTime * rotationSpeed; // make it a fixed update maybe

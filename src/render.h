@@ -10,7 +10,8 @@
 #define AXIS_GREEN  0x66FB66
 #define AXIS_BLUE   0x6666FB
 #define BG_COLOR    0x222222
-#define CAST_TILE   0xddfb66
+#define CAST_TILE   0xDDFB66
+#define SELECT_TILE 0x003366
 
 
 glm::vec3 hexToRgb(uint32_t color);
