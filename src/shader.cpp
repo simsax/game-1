@@ -2,7 +2,15 @@
 #include "utils.h"
 #include "logger.h"
 
-Shader::Shader(const char* vertexShaderPath, const char* fragmentShaderPath) {
+Shader::Shader() : 
+    m_ProgramId(0),
+    m_UniformLocationCache({})
+{}
+
+Shader::Shader(const char* vertexShaderPath, const char* fragmentShaderPath) :
+    m_ProgramId(0),
+    m_UniformLocationCache({})
+{
     // compile vertex shader
     std::string vertexShaderSource = readFile(vertexShaderPath);
     uint32_t vertexShader = glCreateShader(GL_VERTEX_SHADER);

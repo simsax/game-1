@@ -43,6 +43,7 @@ add_executable(${PROJECT_NAME}
     src/render.cpp
     src/texture.cpp
     src/camera.cpp
+    src/levelEditor.cpp
 )
 
 add_subdirectory(extern/glad)

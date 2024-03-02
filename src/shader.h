@@ -12,6 +12,7 @@
 class Shader
 {
 public:
+    Shader();
     Shader(const char* vertexShaderPath, const char* fragmentShaderPath);
     void Bind();
     void Unbind();

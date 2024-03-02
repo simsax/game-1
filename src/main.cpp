@@ -5,14 +5,13 @@
 #include <cmath>
 #include <cstdlib>
 #include <SDL2/SDL.h>
-#include <glm/gtx/string_cast.hpp>
 #include "render.h"
-#include "Config.h"
 #include "utils.h"
 #include "shader.h"
 #include "mesh.h"
 #include "camera.h"
 #include "logger.h"
+#include "levelEditor.h"
 // imgui
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -28,7 +27,6 @@
 #define SCREEN_WIDTH 1920
 #define SCREEN_HEIGHT 1080
 
-#define ABS_PATH(x) (PROJECT_SOURCE_DIR x)
 
 #define SDL_ERROR() LOG_ERROR("SDL_Error: {}", SDL_GetError())
 
@@ -130,16 +128,6 @@ struct Vertex {
     glm::vec2 texture; // Probably I can cut this
 };
 
-struct EditorVertex {
-    glm::vec3 position;
-    glm::vec3 color;
-};
-
-struct LineVertex {
-    static constexpr int numVertices = 2;
-    EditorVertex tileVertices[numVertices]; // mesh
-};
-
 struct Tile {
     void SetColor(const glm::vec3& color) {
         for (auto& vertex : tileVertices) {
@@ -151,16 +139,6 @@ struct Tile {
     Vertex tileVertices[numVertices]; // mesh
 };
 
-struct EditorTile {
-    void SetColor(const glm::vec3& color) {
-        for (auto& vertex : tileVertices) {
-            vertex.color = color;
-        }
-    }
-
-    static constexpr int numVertices = 4;
-    EditorVertex tileVertices[numVertices]; // mesh
-};
 
 // TODO: face culling
 int main() {
@@ -290,62 +268,14 @@ int main() {
         }
     }
 
-    // editor tiles
-    static constexpr int sideNumEditor = 100;
-    static constexpr int numTilesEditor = sideNumEditor * sideNumEditor;
-    std::vector<EditorTile> editorTilesVector;
-    editorTilesVector.reserve(numTilesEditor);
-
-    static constexpr int offset = sideNumEditor / 2;
-    const glm::vec3 lineColor = glm::vec3(0.5);
-    for (int z = 0; z < sideNumEditor; z++) {
-        for (int x = 0; x < sideNumEditor; x++) {
-            editorTilesVector.push_back({
-                    EditorVertex{glm::vec3(x - offset, 0.0f, z - offset), lineColor},
-                    EditorVertex{glm::vec3(x + 1 - offset, 0.0f, z - offset), lineColor},
-                    EditorVertex{glm::vec3(x + 1 - offset, 0.0f, z + 1 - offset), lineColor},
-                    EditorVertex{glm::vec3(x - offset, 0.0f, z + 1 - offset), lineColor}
-            });
-        }
-    }
+    levelEditor::Init(100, glm::vec3(0.5f), 
+            ABS_PATH("/res/shaders/editorTileShader.vert"),
+            ABS_PATH("/res/shaders/editorTileShader.frag"),
+            ABS_PATH("/res/shaders/selectedTileShader.vert"),
+            ABS_PATH("/res/shaders/axisShader.vert"));
 
     std::vector<uint32_t> cubeIndices = generateQuadIndices(6);
     std::vector<uint32_t> tilesIndices = generateQuadIndices(numTiles);
-    std::vector<uint32_t> editorTilesIndices = generateQuadLineIndices(numTilesEditor);
-
-    EditorTile castedTile = {
-        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
-        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
-        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
-        EditorVertex{glm::vec3(0), glm::vec3(0, 1, 0)},
-    };
-
-    EditorTile selectedTile = {
-        EditorVertex{glm::vec3(0, 0, 0), hexToRgb(SELECT_TILE)},
-        EditorVertex{glm::vec3(1, 0, 0), hexToRgb(SELECT_TILE)},
-        EditorVertex{glm::vec3(1, 0, 1), hexToRgb(SELECT_TILE)},
-        EditorVertex{glm::vec3(0, 0, 1), hexToRgb(SELECT_TILE)},
-    };
-
-    static constexpr float halfLength = 1000.0f;
-    glm::vec3 axisRed = hexToRgb(AXIS_RED);
-    glm::vec3 axisGreen = hexToRgb(AXIS_GREEN);
-    glm::vec3 axisBlue = hexToRgb(AXIS_BLUE);
-
-    std::vector<LineVertex> axisLines = {
-        LineVertex({
-                EditorVertex{glm::vec3(-halfLength, 0, 0), axisRed},
-                EditorVertex{glm::vec3(halfLength, 0, 0), axisRed},
-                }),
-        LineVertex({
-                EditorVertex{glm::vec3(0, 0, -halfLength), axisBlue},
-                EditorVertex{glm::vec3(0, 0, halfLength), axisBlue},
-                }),
-        LineVertex({
-                EditorVertex{glm::vec3(0, -halfLength, 0), axisGreen},
-                EditorVertex{glm::vec3(0, halfLength, 0), axisGreen},
-                }),
-    };
 
     std::vector<Layout> cubeLayout = {
         { GL_FLOAT, 3 },
@@ -357,11 +287,6 @@ int main() {
         { GL_FLOAT, 3 },
         { GL_FLOAT, 3 },
         { GL_FLOAT, 2 }
-    };
-
-    std::vector<Layout> editorTilesLayout = {
-        { GL_FLOAT, 3 },
-        { GL_FLOAT, 3 }
     };
 
     Mesh cubeMesh = Mesh(
@@ -386,26 +311,6 @@ int main() {
             tilesIndices.size() * sizeof(uint32_t));
 
 
-    Mesh castedTileMesh = Mesh(&castedTile, EditorTile::numVertices, sizeof(EditorTile), tilesLayout, GL_DYNAMIC_DRAW);
-    Mesh selectedTileMesh = Mesh(&selectedTile, EditorTile::numVertices, sizeof(EditorTile), tilesLayout, GL_DYNAMIC_DRAW);
-
-    Mesh editorTilesMesh = Mesh(
-            editorTilesVector.data(),
-            editorTilesVector.size() * EditorTile::numVertices,
-            editorTilesVector.size() * sizeof(EditorTile),
-            editorTilesLayout,
-            GL_STATIC_DRAW,
-            editorTilesIndices.data(),
-            editorTilesIndices.size(),
-            editorTilesIndices.size() * sizeof(uint32_t));
-
-    Mesh axisLinesMesh = Mesh(
-            axisLines.data(),
-            axisLines.size() * LineVertex::numVertices,
-            axisLines.size() * sizeof(LineVertex),
-            editorTilesLayout,
-            GL_STATIC_DRAW);
-
     // compile and link shaders
     Shader cubeShader = Shader(
             ABS_PATH("/res/shaders/cubeShader.vert"),
@@ -415,17 +320,6 @@ int main() {
             ABS_PATH("/res/shaders/cubeShader.vert"),
             ABS_PATH("/res/shaders/tileShader.frag"));
 
-    Shader editorTilesShader = Shader(
-            ABS_PATH("/res/shaders/editorTileShader.vert"),
-            ABS_PATH("/res/shaders/editorTileShader.frag"));
-
-    Shader selectedTilesShader = Shader(
-            ABS_PATH("/res/shaders/selectedTileShader.vert"),
-            ABS_PATH("/res/shaders/editorTileShader.frag"));
-
-    Shader axisShader = Shader(
-            ABS_PATH("/res/shaders/axisShader.vert"),
-            ABS_PATH("/res/shaders/editorTileShader.frag"));
 
     // some globals (outside the game loop)
     bool quit = false;
@@ -454,11 +348,8 @@ int main() {
     int numFrames = 0;
     bool wheelPressed = false;
     bool shiftPressed = false;
-    glm::vec3 axisOffset = glm::vec3(0);
     const glm::vec3 tileColor = hexToRgb(CAST_TILE);
     bool mouseOnUI = false;
-    bool tileIsCasted = false;
-    int castedTileIndex = -1;
 
     // game loop
     while(!quit) {
@@ -599,13 +490,13 @@ int main() {
                     if (!mouseOnUI) {
                         switch (event.button.button) {
                             case SDL_BUTTON_LEFT:
-                                if (tileIsCasted) {
-                                    /* editorTilesVector[castedTileIndex]. */
+                                if (levelEditor::castedTile != -1) {
+                                    levelEditor::AddCastedToSelected();
                                 }
                                 break;
                             case SDL_BUTTON_RIGHT:
-                                if (tileIsCasted) {
-                                    /* std::erase(selectedTiles, castedTileIndex); */
+                                if (levelEditor::castedTile != -1) {
+                                    levelEditor::RemoveCastedFromSelected();
                                 }
                                 break;
                             case SDL_BUTTON_MIDDLE:
@@ -668,9 +559,10 @@ int main() {
         }
 
         camera.Update(deltaTime);
+        levelEditor::Update();
 
         // raycast
-        tileIsCasted = false;
+        levelEditor::castedTile = -1;
         if (!mouseOnUI) {
             if (editorMode && camera.GetMode() == CameraMode::ORBIT) {
                 int x, y;
@@ -709,23 +601,21 @@ int main() {
 
                     int tileX = floor(raycastedPoint.x);
                     int tileZ = floor(raycastedPoint.z);
-                    tileX += offset;
-                    tileZ += offset;
-
-                    int tileIx = tileZ * sideNumEditor + tileX;
-                    if (tileX >= 0 && tileZ >= 0 && tileX < sideNumEditor && tileZ < sideNumEditor) {
-                        tileIsCasted = true;
-                        castedTileIndex = tileIx;
-                        castedTile = editorTilesVector[tileIx];
-                        castedTile.SetColor(tileColor);
-                        castedTileMesh.UpdateBufferData(0, sizeof(EditorTile), &castedTile);
+                    int tileIx = levelEditor::GetTileIndex(tileX, tileZ);
+                    if (tileIx != -1) {
+                        // TODO: kinda ugly, refactor
+                        levelEditor::castedTile = tileIx;
+                        levelEditor::castedTileQuad = levelEditor::gridVertices[tileIx];
+                        levelEditor::castedTileQuad.SetColor(tileColor);
+                        levelEditor::castedTileMesh.UpdateBufferData(0,
+                                sizeof(levelEditor::TileQuad), &levelEditor::castedTileQuad);
                     }
                 }
             }
         }
 
         glm::vec3 normalizedCameraPos = glm::normalize(camera.GetPos());
-        axisOffset = 0.1f * normalizedCameraPos;
+        levelEditor::axisOffset = 0.1f * normalizedCameraPos;
 
         // render
         const glm::vec3 background = hexToRgb(BG_COLOR);
@@ -809,30 +699,7 @@ int main() {
 
         // render level editor 
         if (editorMode) {
-            editorTilesShader.Bind();
-            editorTilesShader.SetUniformMatrix4fv("mvp", vp);
-
-            // render tiles
-            editorTilesMesh.BindVao();
-            glLineWidth(1);
-            glDrawElements(GL_LINES, editorTilesMesh.GetNumIndices(), GL_UNSIGNED_INT, 0);
-
-            // render raycasted tile
-            if (tileIsCasted) {
-                castedTileMesh.BindVao();
-                glLineWidth(4);
-                glDisable(GL_DEPTH_TEST);
-                glDrawArrays(GL_LINE_LOOP, 0, castedTileMesh.GetNumVertices());
-                glEnable(GL_DEPTH_TEST);
-            }
-
-            // render axis
-            axisShader.Bind();
-            axisShader.SetUniformMatrix4fv("mvp", vp);
-            axisShader.SetUniform3f("axisOffset", axisOffset.x, axisOffset.y, axisOffset.z);
-            axisLinesMesh.BindVao();
-            glLineWidth(2);
-            glDrawArrays(GL_LINES, 0, axisLinesMesh.GetNumVertices() - LineVertex::numVertices);
+            levelEditor::Render(vp);
         }
 
 

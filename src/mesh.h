@@ -63,6 +63,15 @@ class Mesh {
         };
     */
 public:
+    Mesh() :
+        m_Vao(0),
+        m_Vbo(0),
+        m_Ebo(0),
+        m_Stride(0),
+        m_VerticesCount(0),
+        m_IndicesCount(0)
+    { }
+
     Mesh(const void* verticesData, size_t verticesCount, size_t verticesSize,
         const std::vector<Layout>& layouts, GLenum usage,
         const void* indicesData = nullptr, size_t indicesCount = 0, size_t indicesSize = 0) :
@@ -110,6 +119,12 @@ public:
         glBindBuffer(GL_ARRAY_BUFFER, m_Vbo);
         glBufferSubData(GL_ARRAY_BUFFER, offset, size, data);
     }
+
+    inline void UpdateElementBufferData(size_t offset, size_t size, const void* data) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Ebo);
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, offset, size, data);
+    }
+
 
     inline void BindVao() {
         glBindVertexArray(m_Vao);
