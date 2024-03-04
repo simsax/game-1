@@ -271,7 +271,6 @@ int main() {
     levelEditor::Init(100, glm::vec3(0.5f), 
             ABS_PATH("/res/shaders/editorTileShader.vert"),
             ABS_PATH("/res/shaders/editorTileShader.frag"),
-            ABS_PATH("/res/shaders/selectedTileShader.vert"),
             ABS_PATH("/res/shaders/axisShader.vert"));
 
     std::vector<uint32_t> cubeIndices = generateQuadIndices(6);

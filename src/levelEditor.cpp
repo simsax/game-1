@@ -1,5 +1,6 @@
 #include "levelEditor.h"
 #include "render.h"
+#include "logger.h"
 
 namespace levelEditor {
 
@@ -24,25 +25,26 @@ namespace levelEditor {
     int numTiles;
     int gridOffset;
     int castedTile;
+    bool selectionNeedsUpdate;
 
     // functions
     void Init(int sideLength, const glm::vec3& lineColor, const char* vertexShaderPath,
-            const char* fragmentShaderPath, const char* selectedTileVertexShader,
-            const char* axisVertexShaderPath)
+            const char* fragmentShaderPath, const char* axisVertexShaderPath)
     {
         layout = { { GL_FLOAT, 3 }, { GL_FLOAT, 3 } };
         gridSideLength = sideLength;
         gridOffset = gridSideLength / 2;
         numTiles = sideLength * sideLength;
         castedTile = -1;
-        static constexpr glm::vec3 selectedLinesColor = glm::vec3(0,0,1);
+        static constexpr glm::vec3 selectedLinesColor = glm::vec3(0,0.7,1);
+        selectionNeedsUpdate = true;
 
         // vertices
         {
             gridVertices.reserve(numTiles);
             selectedTiles.reserve(numTiles);
             gridIndices = generateQuadLineIndices(numTiles);
-            selectedTilesIndices = generateQuadLineIndices(numTiles);
+            selectedTilesIndices = generateQuadIndices(numTiles);
 
             // editor lines data
             for (int z = 0; z < sideLength; z++) {
@@ -55,10 +57,10 @@ namespace levelEditor {
                             });
 
                     selectedTilesVertices.push_back({
-                            Vertex{glm::vec3(x - gridOffset, 0.0f, z - gridOffset), selectedLinesColor},
-                            Vertex{glm::vec3(x + 1 - gridOffset, 0.0f, z - gridOffset), selectedLinesColor},
-                            Vertex{glm::vec3(x + 1 - gridOffset, 0.0f, z + 1 - gridOffset), selectedLinesColor},
-                            Vertex{glm::vec3(x - gridOffset, 0.0f, z + 1 - gridOffset), selectedLinesColor}
+                            Vertex{glm::vec3(x - gridOffset, 0.01f, z - gridOffset), selectedLinesColor},
+                            Vertex{glm::vec3(x + 1 - gridOffset, 0.01f, z - gridOffset), selectedLinesColor},
+                            Vertex{glm::vec3(x + 1 - gridOffset, 0.01f, z + 1 - gridOffset), selectedLinesColor},
+                            Vertex{glm::vec3(x - gridOffset, 0.01f, z + 1 - gridOffset), selectedLinesColor}
                             });
                 }
             }
@@ -130,7 +132,6 @@ namespace levelEditor {
         // shaders
         {
             editorGridShader = Shader(vertexShaderPath, fragmentShaderPath);
-            /* selectedTilesShader = Shader(vertexShaderPath, fragmentShaderPath); */
             axisShader = Shader(axisVertexShaderPath, fragmentShaderPath);
         }
 
@@ -138,20 +139,23 @@ namespace levelEditor {
 
     void Update() {
         // super inefficient but who cares, it's just the editor and I'm prototyping
-        std::vector<TileQuad> currentSelectedVertices;
-        const int numSelected = selectedTiles.size();
-        currentSelectedVertices.reserve(numSelected);
+        if (selectionNeedsUpdate) {
+            selectionNeedsUpdate = false;
+            std::vector<TileQuad> currentSelectedVertices;
+            const int numSelected = selectedTiles.size();
+            currentSelectedVertices.reserve(numSelected);
 
-        for (int tileIx : selectedTiles) {
-            currentSelectedVertices.push_back(selectedTilesVertices[tileIx]);
+            for (int tileIx : selectedTiles) {
+                currentSelectedVertices.push_back(selectedTilesVertices[tileIx]);
+            }
+
+            selectedTilesIndices = generateQuadIndices(numSelected);
+
+            selectedTilesMesh.UpdateBufferData(0, currentSelectedVertices.size() * sizeof(TileQuad),
+                    currentSelectedVertices.data());
+            selectedTilesMesh.UpdateElementBufferData(0, selectedTilesIndices.size() * sizeof(uint32_t),
+                    selectedTilesIndices.data());
         }
-
-        selectedTilesIndices = generateQuadLineIndices(numSelected);
-
-        selectedTilesMesh.UpdateBufferData(0, currentSelectedVertices.size() * sizeof(TileQuad),
-                currentSelectedVertices.data());
-        selectedTilesMesh.UpdateElementBufferData(0, selectedTilesIndices.size() * sizeof(uint32_t),
-                selectedTilesIndices.data());
     }
 
     void Render(const glm::mat4& mvp) {
@@ -174,9 +178,7 @@ namespace levelEditor {
         // render selected tiles
         selectedTilesMesh.BindVao();
         glLineWidth(4);
-        glDrawElements(GL_LINES, selectedTilesIndices.size(), GL_UNSIGNED_INT, 0);
-        // TODOs: 1. offset it a lil bit on the z axis
-        //        2. should highlight the quad not the grid to avoid weird edge cases
+        glDrawElements(GL_TRIANGLES, selectedTilesIndices.size(), GL_UNSIGNED_INT, 0);
 
         // render axis
         axisShader.Bind();
@@ -199,10 +201,12 @@ namespace levelEditor {
 
     void AddCastedToSelected() {
         selectedTiles.push_back(castedTile);
+        selectionNeedsUpdate = true;
     }
 
     void RemoveCastedFromSelected() {
         std::erase(selectedTiles, castedTile);
+        selectionNeedsUpdate = true;
     }
 
 }

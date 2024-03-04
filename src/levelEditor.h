@@ -32,8 +32,7 @@ namespace levelEditor {
     };
 
     void Init(int sideLength, const glm::vec3& lineColor, const char* vertexShaderPath,
-        const char* fragmentShaderPath, const char* selectedTileVertexShader,
-        const char* axisVertexShaderPath);
+        const char* fragmentShaderPath, const char* axisVertexShaderPath);
     void GetSideLength();
     int GetTileIndex(int tileX, int tileZ);
     void AddCastedToSelected();
