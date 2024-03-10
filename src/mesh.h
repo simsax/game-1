@@ -115,19 +115,21 @@ public:
         }
     }
 
-    inline void UpdateBufferData(size_t offset, size_t size, const void* data) {
+    inline void UpdateBufferData(size_t offset, size_t count, size_t size, const void* data) {
         glBindBuffer(GL_ARRAY_BUFFER, m_Vbo);
         glBufferSubData(GL_ARRAY_BUFFER, offset, size, data);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+        m_VerticesCount = count;
     }
 
-    inline void UpdateElementBufferData(size_t offset, size_t size, const void* data) {
+    inline void UpdateElementBufferData(size_t offset, size_t count, size_t size, const void* data) {
         BindVao();
         /* glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Ebo); */
         // reminder: binding the EBO is not necessary because VAO has direct reference of EBO
         // on the other end, if I bind the EBO while the wrong VAO is bound, I will override the 
         // EBO of that bound VAO
         glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, offset, size, data);
+        m_IndicesCount = count;
     }
 
 

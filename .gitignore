@@ -1,3 +1,4 @@
+res/levels/*
 .cache
 cmake-build*
 *.idea

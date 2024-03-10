@@ -16,6 +16,8 @@
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
+#include <fstream>
+#include <iostream>
 
 #define WIREFRAME 0
 
@@ -50,9 +52,7 @@ enum class Face {
     U, F, D, B, L, R
 };
 
-Face cubeState[] = { Face::U, Face::F, Face::D, Face::B, Face::L, Face::R };
-
-static void turn(Face* state, Rotation rotation) {
+static void turn(std::array<Face, 6>& state, Rotation rotation) {
     switch (rotation) {
         case Rotation::DOWN:
             {
@@ -95,24 +95,6 @@ static void turn(Face* state, Rotation rotation) {
     }
 }
 
-
-static const char* getFaceStr(Face face) {
-    switch (face) {
-        case Face::U:
-            return "U";
-        case Face::L:
-            return "L";
-        case Face::R:
-            return "R";
-        case Face::F:
-            return "F";
-        case Face::B:
-            return "B";
-        case Face::D:
-            return "D";
-    }
-}
-
 template <typename T>
 T* SDL(T* ptr) {
     if (ptr == nullptr) {
@@ -139,6 +121,230 @@ struct Tile {
     Vertex tileVertices[numVertices]; // mesh
 };
 
+struct LevelState {
+    std::vector<TileType> tiles;
+    glm::mat4 model;
+    std::array<Face, 6> playerRot;
+    glm::vec3 playerPos;
+} levelState = {
+    {},
+    glm::mat4(1.0f),
+    { Face::U, Face::F, Face::D, Face::B, Face::L, Face::R },
+    glm::vec3(0.0f)};
+
+// game state globals
+bool tilesNeedUpdate = true;
+std::vector<Tile> currentGroundVertices;
+bool firstAccess = false;
+
+void SaveLevelToFile(const char* filePath, const LevelState& levelState, int rowLength) {
+    std::ofstream outputFile(filePath);
+
+    if (!outputFile) {
+        LOG_ERROR("Failed at creating file {}", filePath);
+        exit(EXIT_FAILURE);
+    }
+
+    // save player pos
+    outputFile << "(" << levelState.playerPos[0] << ",";
+    outputFile << levelState.playerPos[1] << ",";
+    outputFile << levelState.playerPos[2] << ")\n";
+
+    // save player orientation (cube state)
+    outputFile << "(";
+    for (int i = 0; i < 6; i++) {
+        outputFile << (int)levelState.playerRot[i];
+        if (i != 5)
+            outputFile << ",";
+    }
+    outputFile << ")\n";
+
+    // save player orientation (model matrix)
+    outputFile << "[";
+    for (int i = 0; i < 4; i++) {
+        outputFile << "[";
+        for (int j = 0; j < 4; j++) {
+            outputFile << levelState.model[i][j];
+            if (j != 3)
+                outputFile << ",";
+        }
+        outputFile << "]";
+        if (i != 3)
+            outputFile << ",";
+    }
+    outputFile << "]\n";
+
+    // save tiles map
+    int colCounter = 0;
+    for (auto tile : levelState.tiles) {
+        switch (tile) {
+            case TileType::EMPTY_TILE:
+                outputFile << ".";
+                break;
+            case TileType::GROUND_TILE:
+                outputFile << "#";
+                break;
+            case TileType::DARK_TILE:
+                outputFile << "D";
+                break;
+            case TileType::LIGHT_TILE:
+                outputFile << "L";
+                break;
+        }
+        colCounter++;
+        if (colCounter == rowLength) {
+            outputFile << "\n";
+            colCounter = 0;
+        }
+    }
+}
+
+LevelState LoadLevelFromFile(const char* filePath, size_t maxSize) {
+    LevelState levelState;
+    std::ifstream inputFile(filePath);
+    levelState.tiles.reserve(maxSize);
+
+    if (!inputFile) {
+        LOG_ERROR("Failed to read {}", filePath);
+        exit(EXIT_FAILURE);
+    }
+
+    std::string line;
+    int lineCounter = 0;
+    while (std::getline(inputFile, line)) {
+        if (lineCounter == 0) {
+            // load pos
+            int numParsed = 0;
+            size_t i = 0;
+            while (i < line.length()) {
+                char c = line[i];
+                switch (c) {
+                    case '(':
+                    case ')':
+                    case ',':
+                    case ' ':
+                        i++;
+                        break;
+                    default:
+                        // parse number
+                        {
+                            size_t start = i;
+                            while (i < line.length() - 1 &&
+                                    line[i + 1] != ',' &&
+                                    line[i + 1] != ')' &&
+                                    line[i + 1] != ' ') {
+                                i++;
+                            }
+                            size_t numLen = i - start + 1;
+                            std::string numStr = line.substr(start, numLen);
+                            if (numParsed > 2) {
+                                LOG_ERROR("Error while loading level file, player position is invalid");
+                            }
+                            levelState.playerPos[numParsed++] = std::stof(numStr);
+                            i++;
+                        }
+                        break;
+                }
+            }
+        } else if (lineCounter == 1) {
+            // load cubeState
+            int numParsed = 0;
+            size_t i = 0;
+            while (i < line.length()) {
+                char c = line[i];
+                switch (c) {
+                    case '(':
+                    case ')':
+                    case ',':
+                    case ' ':
+                        i++;
+                        break;
+                    default:
+                        // parse number
+                        {
+                            size_t start = i;
+                            while (i < line.length() - 1 &&
+                                    line[i + 1] != ',' &&
+                                    line[i + 1] != ')' &&
+                                    line[i + 1] != ' ') {
+                                i++;
+                            }
+                            size_t numLen = i - start + 1;
+                            std::string numStr = line.substr(start, numLen);
+                            if (numParsed > 5) {
+                                LOG_ERROR("Error while loading level file, player rotation is invalid");
+                            }
+                            levelState.playerRot[numParsed++] = static_cast<Face>(std::stoi(numStr));
+                            i++;
+                        }
+                        break;
+                }
+            }
+
+        } else if (lineCounter == 2) {
+            // load model matrix
+            int numParsed = 0;
+            size_t i = 0;
+            while (i < line.length()) {
+                char c = line[i];
+                switch (c) {
+                    case '[':
+                    case ']':
+                    case ',':
+                    case ' ':
+                        i++;
+                        break;
+                    default:
+                        // parse number
+                        {
+                            size_t start = i;
+                            while (i < line.length() - 1 &&
+                                    line[i + 1] != ',' &&
+                                    line[i + 1] != '[' &&
+                                    line[i + 1] != ']' &&
+                                    line[i + 1] != ' ') {
+                                i++;
+                            }
+                            size_t numLen = i - start + 1;
+                            std::string numStr = line.substr(start, numLen);
+                            if (numParsed > 15) {
+                                LOG_ERROR("Error while loading level file, model matrix is invalid");
+                            }
+                            int row = numParsed / 4;
+                            int col = numParsed % 4;
+                            levelState.model[row][col] = std::stof(numStr);
+                            numParsed++;
+                            i++;
+                        }
+                        break;
+                }
+            }
+        } else {
+            // load tile map
+            for (char c : line) {
+                switch (c) {
+                    case '.':
+                        levelState.tiles.push_back(TileType::EMPTY_TILE);
+                        break;
+                    case '#':
+                        levelState.tiles.push_back(TileType::GROUND_TILE);
+                        break;
+                    case 'D':
+                        levelState.tiles.push_back(TileType::DARK_TILE);
+                        break;
+                    case 'L':
+                        levelState.tiles.push_back(TileType::LIGHT_TILE);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+        lineCounter++;
+    }
+
+    return levelState;
+}
 
 // TODO: face culling
 int main() {
@@ -193,6 +399,8 @@ int main() {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE); 
 	glEnable(GL_LINE_SMOOTH);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glLineWidth(1);
     // v sync (disable when profiling performance)
     SDL_GL_SetSwapInterval(1); // read the docs (can be 0, 1, -1)
@@ -252,25 +460,30 @@ int main() {
 
 
     // level tiles
-    static constexpr int sideNum = 3;
+    static constexpr int sideNum = 100;
+    static constexpr int offset = sideNum / 2;
     static constexpr int numTiles = sideNum * sideNum;
-    std::vector<Tile> tilesVector;
-    tilesVector.reserve(numTiles);
+    std::vector<Tile> tilesVertices;
+    tilesVertices.reserve(numTiles);
+    if (!firstAccess)
+        levelState = LoadLevelFromFile(ABS_PATH("/res/levels/level1.txt"), numTiles);
+    currentGroundVertices.reserve(numTiles);
 
     for (int z = 0; z < sideNum; z++) {
         for (int x = 0; x < sideNum; x++) {
-            tilesVector.push_back({
-                Vertex{glm::vec3(x, 0.0f, z),         glm::vec3(1.0f),  glm::vec2(0.0f, 0.0f)},
-                Vertex{glm::vec3(x + 1, 0.0f, z),     glm::vec3(1.0f),  glm::vec2(1.0f, 0.0f)},
-                Vertex{glm::vec3(x + 1, 0.0f, z + 1), glm::vec3(1.0f),  glm::vec2(1.0f, 1.0f)},
-                Vertex{glm::vec3(x, 0.0f, z + 1),     glm::vec3(1.0f),  glm::vec2(0.0f, 1.0f)}
+            tilesVertices.push_back({
+                Vertex{glm::vec3(x - offset, 0.0f, z - offset),         glm::vec3(1.0f),  glm::vec2(0.0f, 0.0f)},
+                Vertex{glm::vec3(x + 1 - offset, 0.0f, z - offset),     glm::vec3(1.0f),  glm::vec2(1.0f, 0.0f)},
+                Vertex{glm::vec3(x + 1 - offset, 0.0f, z + 1 - offset), glm::vec3(1.0f),  glm::vec2(1.0f, 1.0f)},
+                Vertex{glm::vec3(x - offset, 0.0f, z + 1 - offset),     glm::vec3(1.0f),  glm::vec2(0.0f, 1.0f)}
             });
         }
     }
 
-    levelEditor::Init(100, glm::vec3(0.5f), 
+    levelEditor::Init(sideNum, glm::vec3(0.5f), 
             ABS_PATH("/res/shaders/editorTileShader.vert"),
             ABS_PATH("/res/shaders/editorTileShader.frag"),
+            ABS_PATH("/res/shaders/selectedTileShader.frag"),
             ABS_PATH("/res/shaders/axisShader.vert"));
 
     std::vector<uint32_t> cubeIndices = generateQuadIndices(6);
@@ -300,9 +513,9 @@ int main() {
     
     // TODO: dynamic or stream?
     Mesh tilesMesh = Mesh(
-            tilesVector.data(),
-            tilesVector.size() * Tile::numVertices,
-            tilesVector.size() * sizeof(Tile),
+            tilesVertices.data(),
+            tilesVertices.size() * Tile::numVertices,
+            tilesVertices.size() * sizeof(Tile),
             tilesLayout,
             GL_DYNAMIC_DRAW,
             tilesIndices.data(),
@@ -328,10 +541,14 @@ int main() {
     // since lines are almost parallel
     Camera camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT, 0.1f, 10000.0f, cameraPos, cameraFront,
             glm::vec3(0.0f, 1.0f, 0.0f), 10.0f, 10.0f, 0.1f, 20.0f);
-    glm::vec3 pos = glm::vec3(0.0f);
     glm::vec3 absoluteTrans = glm::vec3(0.5f);
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), absoluteTrans);
-    glm::mat4 frozenModel = model;
+
+    if (firstAccess) {
+        levelState.model = glm::translate(glm::mat4(1.0f), absoluteTrans);
+        levelState.tiles = std::vector(numTiles, TileType::EMPTY_TILE);
+    }
+
+    glm::mat4 frozenModel = levelState.model;
     bool rotating = false;
     float angle = 0.0f;
     glm::vec3 axis = glm::vec3(0);
@@ -396,10 +613,10 @@ int main() {
                                 axis = glm::vec3(1,0,0);
                                 angle = 90.0f;
                                 rotating = true;
-                                frozenModel = model;
+                                frozenModel = levelState.model;
                                 translationAxis = glm::vec3(0, 0.5, -0.5);
                                 rotation = Rotation::DOWN;
-                                turn(cubeState, rotation);
+                                turn(levelState.playerRot, rotation);
                             }
                             break;
                         case SDLK_UP:
@@ -407,10 +624,10 @@ int main() {
                                 axis = glm::vec3(1,0,0);
                                 angle = -90.0f;
                                 rotating = true;
-                                frozenModel = model;
+                                frozenModel = levelState.model;
                                 translationAxis = glm::vec3(0, 0.5, 0.5);
                                 rotation = Rotation::UP;
-                                turn(cubeState, rotation);
+                                turn(levelState.playerRot, rotation);
                             }
                             break;
                         case SDLK_LEFT:
@@ -418,10 +635,10 @@ int main() {
                                 axis = glm::vec3(0,0,1);
                                 angle = 90.0f;
                                 rotating = true;
-                                frozenModel = model;
+                                frozenModel = levelState.model;
                                 translationAxis = glm::vec3(0.5, 0.5, 0);
                                 rotation = Rotation::LEFT;
-                                turn(cubeState, rotation);
+                                turn(levelState.playerRot, rotation);
                             }
                             break;
                         case SDLK_RIGHT:
@@ -429,10 +646,10 @@ int main() {
                                 axis = glm::vec3(0,0,1);
                                 angle = -90.0f;
                                 rotating = true;
-                                frozenModel = model;
+                                frozenModel = levelState.model;
                                 translationAxis = glm::vec3(-0.5, 0.5, 0);
                                 rotation = Rotation::RIGHT;
-                                turn(cubeState, rotation);
+                                turn(levelState.playerRot, rotation);
                             }
                             break;
                         case SDLK_LSHIFT:
@@ -560,6 +777,41 @@ int main() {
         camera.Update(deltaTime);
         levelEditor::Update();
 
+        if (tilesNeedUpdate) {
+            tilesNeedUpdate = false;
+            currentGroundVertices.clear();
+
+            size_t numVisible = 0;
+            for (size_t i = 0; i < levelState.tiles.size(); i++) {
+                switch (levelState.tiles[i]) {
+                    case TileType::GROUND_TILE:
+                        currentGroundVertices.push_back(tilesVertices[i]);
+                        currentGroundVertices[numVisible].SetColor(hexToRgb(GROUND_TILE_COLOR));
+                        numVisible++;
+                        break;
+                    case TileType::DARK_TILE:
+                        currentGroundVertices.push_back(tilesVertices[i]);
+                        currentGroundVertices[numVisible].SetColor(hexToRgb(DARK_TILE_COLOR));
+                        numVisible++;
+                        break;
+                    case TileType::LIGHT_TILE:
+                        currentGroundVertices.push_back(tilesVertices[i]);
+                        currentGroundVertices[numVisible].SetColor(hexToRgb(LIGHT_TILE_COLOR));
+                        numVisible++;
+                        break;
+                    case TileType::EMPTY_TILE:
+                        break;
+                }
+            }
+
+            tilesIndices = generateQuadIndices(numVisible);
+
+            tilesMesh.UpdateBufferData(0, currentGroundVertices.size(),
+                    currentGroundVertices.size() * sizeof(Tile), currentGroundVertices.data());
+            tilesMesh.UpdateElementBufferData(0, tilesIndices.size(),
+                    tilesIndices.size() * sizeof(uint32_t), tilesIndices.data());
+        }
+
         // raycast
         levelEditor::castedTile = -1;
         if (!mouseOnUI) {
@@ -606,7 +858,7 @@ int main() {
                         levelEditor::castedTile = tileIx;
                         levelEditor::castedTileQuad = levelEditor::gridVertices[tileIx];
                         levelEditor::castedTileQuad.SetColor(tileColor);
-                        levelEditor::castedTileMesh.UpdateBufferData(0,
+                        levelEditor::castedTileMesh.UpdateBufferData(0, levelEditor::TileQuad::numVertices,
                                 sizeof(levelEditor::TileQuad), &levelEditor::castedTileQuad);
                     }
                 }
@@ -623,7 +875,7 @@ int main() {
 
         // imgui dockspace
         /* ImGui::DockSpaceOverViewport(ImGui::GetMainViewport()); */
-        ImGui::ShowDemoWindow(); // Show demo window! :)
+        /* ImGui::ShowDemoWindow(); // Show demo window! :) */
 
         /* ImGui::Begin("Viewport"); */
         /* ImGui::End(); */
@@ -635,36 +887,37 @@ int main() {
                 rotating = false;
             }
             curAngle = t * angle;
-            glm::mat4 trans = glm::translate(glm::mat4(1.0), - absoluteTrans - pos + translationAxis);
-            glm::mat4 transBack = glm::translate(glm::mat4(1.0), absoluteTrans + pos - translationAxis);
-            model = transBack * glm::rotate(glm::mat4(1.0), glm::radians(curAngle), axis) * trans * frozenModel;
+            glm::mat4 trans = glm::translate(glm::mat4(1.0), - absoluteTrans - levelState.playerPos + translationAxis);
+            glm::mat4 transBack = glm::translate(glm::mat4(1.0), absoluteTrans + levelState.playerPos - translationAxis);
+            levelState.model = transBack * glm::rotate(glm::mat4(1.0), glm::radians(curAngle), axis) * trans * frozenModel;
             if (!rotating) {
                 curAngle = 0.0f;
                 t = 0.0f;
                 // update the position only after the rotation has finished
                 switch (rotation) {
                     case Rotation::UP:
-                        pos.z -= 1;
+                        levelState.playerPos.z -= 1;
                         break;
                     case Rotation::DOWN:
-                        pos.z += 1;
+                        levelState.playerPos.z += 1;
                         break;
                     case Rotation::LEFT:
-                        pos.x -= 1;
+                        levelState.playerPos.x -= 1;
                         break;
                     case Rotation::RIGHT:
-                        pos.x += 1;
+                        levelState.playerPos.x += 1;
                         break;
                     default:
                         break;
                 }
-                Face downFace = cubeState[(int)Orientation::DOWN];
+                Face downFace = levelState.playerRot[(int)Orientation::DOWN];
                 if (downFace == Face::F) {
-                    int tileIx = pos.z * sideNum + pos.x;
-                    if (pos.x >= 0 && pos.z >= 0 && pos.x < sideNum && pos.z < sideNum) {
-                        tilesVector[tileIx].SetColor({1, 0, 0});
-                        tilesMesh.UpdateBufferData(tileIx * sizeof(Tile), sizeof(Tile), &tilesVector[tileIx]);
-                        LOG_INFO("Red face is down, replacing tile at index: {}", tileIx);
+                    if (levelState.playerPos.x >= 0 - offset && levelState.playerPos.z >= 0 - offset && levelState.playerPos.x < sideNum - offset && levelState.playerPos.z < sideNum - offset) {
+                        int tileIx = (levelState.playerPos.z + offset) * sideNum + levelState.playerPos.x + offset;
+                        if (levelState.tiles[tileIx] == TileType::DARK_TILE) {
+                            levelState.tiles[tileIx] = TileType::LIGHT_TILE;
+                            tilesNeedUpdate = true;
+                        }
                     }
                 }
             }
@@ -679,7 +932,7 @@ int main() {
     
         // render cube
         {
-            glm::mat4 mvp = vp * model;
+            glm::mat4 mvp = vp * levelState.model;
             cubeShader.Bind();
             cubeShader.SetUniformMatrix4fv("mvp", mvp);
 
@@ -698,14 +951,18 @@ int main() {
 
         // render level editor 
         if (editorMode) {
-            levelEditor::Render(vp);
+            // hack to allow the editor to access the level tiles
+            levelEditor::Render(vp, &tilesNeedUpdate, levelState.tiles);
         }
-
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
     }
+
+    // serialize level state to a file
+    // need to save player position, orientation and map
+    SaveLevelToFile(ABS_PATH("/res/levels/level1.txt"), levelState, sideNum);
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();

@@ -1,6 +1,9 @@
 #include "levelEditor.h"
 #include "render.h"
 #include "logger.h"
+#include "imgui.h"
+#include "imgui_impl_sdl2.h"
+#include "imgui_impl_opengl3.h"
 
 namespace levelEditor {
 
@@ -18,26 +21,25 @@ namespace levelEditor {
     std::vector<uint32_t> selectedTilesIndices;
     std::vector<int> selectedTiles;
     std::vector<LineVertex> axisLines;
-    std::vector<Layout> layout;
+    std::vector<Layout> layout = { { GL_FLOAT, 3 }, { GL_FLOAT, 3 } };
     TileQuad castedTileQuad;
     glm::vec3 axisOffset;
     int gridSideLength;
     int numTiles;
     int gridOffset;
-    int castedTile;
-    bool selectionNeedsUpdate;
+    int castedTile = -1;
+    bool selectionNeedsUpdate = true;
+    TileType activeTileTypeButton = TileType::EMPTY_TILE;
 
     // functions
     void Init(int sideLength, const glm::vec3& lineColor, const char* vertexShaderPath,
-            const char* fragmentShaderPath, const char* axisVertexShaderPath)
+            const char* fragmentShaderPath, const char* selectedFragmentShaderPath,
+            const char* axisVertexShaderPath)
     {
-        layout = { { GL_FLOAT, 3 }, { GL_FLOAT, 3 } };
         gridSideLength = sideLength;
         gridOffset = gridSideLength / 2;
         numTiles = sideLength * sideLength;
-        castedTile = -1;
         static constexpr glm::vec3 selectedLinesColor = glm::vec3(0,0.7,1);
-        selectionNeedsUpdate = true;
 
         // vertices
         {
@@ -117,7 +119,7 @@ namespace levelEditor {
                     selectedTilesIndices.size(),
                     selectedTilesIndices.size() * sizeof(uint32_t));
 
-            castedTileMesh = Mesh(&castedTile, TileQuad::numVertices,
+            castedTileMesh = Mesh(nullptr, TileQuad::numVertices,
                     sizeof(TileQuad), layout, GL_DYNAMIC_DRAW);
 
             axisLinesMesh = Mesh(
@@ -133,12 +135,13 @@ namespace levelEditor {
         {
             editorGridShader = Shader(vertexShaderPath, fragmentShaderPath);
             axisShader = Shader(axisVertexShaderPath, fragmentShaderPath);
+            selectedTilesShader = Shader(vertexShaderPath, selectedFragmentShaderPath);
         }
 
     }
 
     void Update() {
-        // super inefficient but who cares, it's just the editor and I'm prototyping
+        // super inefficient but who cares, it's just the editor
         if (selectionNeedsUpdate) {
             selectionNeedsUpdate = false;
             std::vector<TileQuad> currentSelectedVertices;
@@ -151,14 +154,25 @@ namespace levelEditor {
 
             selectedTilesIndices = generateQuadIndices(numSelected);
 
-            selectedTilesMesh.UpdateBufferData(0, currentSelectedVertices.size() * sizeof(TileQuad),
-                    currentSelectedVertices.data());
-            selectedTilesMesh.UpdateElementBufferData(0, selectedTilesIndices.size() * sizeof(uint32_t),
-                    selectedTilesIndices.data());
+            selectedTilesMesh.UpdateBufferData(0, currentSelectedVertices.size(),
+                    currentSelectedVertices.size() * sizeof(TileQuad), currentSelectedVertices.data());
+            selectedTilesMesh.UpdateElementBufferData(0, selectedTilesIndices.size(),
+                    selectedTilesIndices.size() * sizeof(uint32_t), selectedTilesIndices.data());
         }
     }
 
-    void Render(const glm::mat4& mvp) {
+    static void AddTiles(TileType tileType, std::vector<TileType>& tiles) {
+        if (selectedTiles.size() > 0) {
+            for (int tileIx : selectedTiles)
+                tiles[tileIx] = tileType;
+            selectedTiles.clear();
+            selectionNeedsUpdate = true;
+        }
+    }
+
+    void Render(const glm::mat4& mvp,
+            bool* tilesNeedUpdate,
+            std::vector<TileType>& tiles) {
         // render tile grid
         editorGridShader.Bind();
         editorGridShader.SetUniformMatrix4fv("mvp", mvp);
@@ -175,11 +189,6 @@ namespace levelEditor {
             glEnable(GL_DEPTH_TEST);
         }
 
-        // render selected tiles
-        selectedTilesMesh.BindVao();
-        glLineWidth(4);
-        glDrawElements(GL_TRIANGLES, selectedTilesIndices.size(), GL_UNSIGNED_INT, 0);
-
         // render axis
         axisShader.Bind();
         axisShader.SetUniformMatrix4fv("mvp", mvp);
@@ -187,6 +196,40 @@ namespace levelEditor {
         axisLinesMesh.BindVao();
         glLineWidth(2);
         glDrawArrays(GL_LINES, 0, axisLinesMesh.GetNumVertices() - LineVertex::numVertices);
+
+        // render selected tiles
+        selectedTilesShader.Bind();
+        selectedTilesShader.SetUniformMatrix4fv("mvp", mvp);
+        selectedTilesMesh.BindVao();
+        glLineWidth(4);
+        glDrawElements(GL_TRIANGLES, selectedTilesIndices.size(), GL_UNSIGNED_INT, 0);
+
+        // imgui
+        {
+            ImGui::Begin("Editor");
+
+            if (ImGui::Button("Empty")) {
+                AddTiles(TileType::EMPTY_TILE, tiles);
+                *tilesNeedUpdate = true;
+            }
+
+            if (ImGui::Button("Ground")) {
+                AddTiles(TileType::GROUND_TILE, tiles);
+                *tilesNeedUpdate = true;
+            }
+
+            if (ImGui::Button("Dark")) {
+                AddTiles(TileType::DARK_TILE, tiles);
+                *tilesNeedUpdate = true;
+            }
+
+            if (ImGui::Button("Light")) {
+                AddTiles(TileType::LIGHT_TILE, tiles);
+                *tilesNeedUpdate = true;
+            }
+
+            ImGui::End();
+        }
     }
 
     int GetTileIndex(int tileX, int tileZ) {

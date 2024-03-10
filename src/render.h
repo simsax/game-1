@@ -12,6 +12,9 @@
 #define BG_COLOR    0x222222
 #define CAST_TILE   0xDDFB66
 #define SELECT_TILE 0x003366
+#define GROUND_TILE_COLOR 0xFFFFFF
+#define DARK_TILE_COLOR 0x770000
+#define LIGHT_TILE_COLOR 0xFF0000
 
 
 glm::vec3 hexToRgb(uint32_t color);
