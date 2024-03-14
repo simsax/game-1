@@ -1,9 +1,22 @@
+#include <fstream>
+#include <iostream>
 #include "levelEditor.h"
 #include "render.h"
 #include "logger.h"
 #include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_opengl3.h"
+#include "shader.h"
+#include "utils.h"
+
+enum class Face {
+    U, F, D, B, L, R
+};
+
+struct LevelState {
+    std::vector<TileType> tiles;
+    glm::mat4 model;
+    std::array<Face, 6> playerRot;
+    glm::vec3 playerPos;
+};
 
 namespace levelEditor {
 
@@ -30,6 +43,8 @@ namespace levelEditor {
     int castedTile = -1;
     bool selectionNeedsUpdate = true;
     TileType activeTileTypeButton = TileType::EMPTY_TILE;
+
+    static char currentLevel[512];
 
     // functions
     void Init(int sideLength, const glm::vec3& lineColor, const char* vertexShaderPath,
@@ -170,9 +185,21 @@ namespace levelEditor {
         }
     }
 
+    static void ResetLevelState(LevelState& levelState) {
+        std::fill(levelState.tiles.begin(), levelState.tiles.end(), TileType::EMPTY_TILE);
+        levelState.model = glm::mat4({
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0.5, 0.5, 0.5, 1
+                });
+        levelState.playerRot = { Face::U, Face::F, Face::D, Face::B, Face::L, Face::R };
+        levelState.playerPos = glm::vec3(0.0f);
+    }
+
     void Render(const glm::mat4& mvp,
-            bool* tilesNeedUpdate,
-            std::vector<TileType>& tiles) {
+            bool& tilesNeedUpdate,
+            LevelState& levelState) {
         // render tile grid
         editorGridShader.Bind();
         editorGridShader.SetUniformMatrix4fv("mvp", mvp);
@@ -208,25 +235,45 @@ namespace levelEditor {
         {
             ImGui::Begin("Editor");
 
+            ImGui::SeparatorText("Edit tiles");
             if (ImGui::Button("Empty")) {
-                AddTiles(TileType::EMPTY_TILE, tiles);
-                *tilesNeedUpdate = true;
+                AddTiles(TileType::EMPTY_TILE, levelState.tiles);
+                tilesNeedUpdate = true;
             }
 
             if (ImGui::Button("Ground")) {
-                AddTiles(TileType::GROUND_TILE, tiles);
-                *tilesNeedUpdate = true;
+                AddTiles(TileType::GROUND_TILE, levelState.tiles);
+                tilesNeedUpdate = true;
             }
 
             if (ImGui::Button("Dark")) {
-                AddTiles(TileType::DARK_TILE, tiles);
-                *tilesNeedUpdate = true;
+                AddTiles(TileType::DARK_TILE, levelState.tiles);
+                tilesNeedUpdate = true;
             }
 
             if (ImGui::Button("Light")) {
-                AddTiles(TileType::LIGHT_TILE, tiles);
-                *tilesNeedUpdate = true;
+                AddTiles(TileType::LIGHT_TILE, levelState.tiles);
+                tilesNeedUpdate = true;
             }
+
+            ImGui::SeparatorText("Level");
+            if (ImGui::Button("Reset current level")) {
+                ResetLevelState(levelState);
+                tilesNeedUpdate = true;
+            }
+
+            ImGui::Separator();
+            if (ImGui::Button("Level 1")) {
+                strncpy(currentLevel, ABS_PATH("/res/levels/level1.txt"), 512);
+                LoadLevelFromFile(currentLevel, levelState);
+                tilesNeedUpdate = true;
+            }
+
+            // add button to add new levels
+            // decide if by default to load the first level
+            // higlight loaded level
+            // if no level loaded by default, quitting should not 
+            // try to write
 
             ImGui::End();
         }
@@ -250,6 +297,220 @@ namespace levelEditor {
     void RemoveCastedFromSelected() {
         std::erase(selectedTiles, castedTile);
         selectionNeedsUpdate = true;
+    }
+
+    void LoadLevelFromFile(const char* filePath, LevelState& levelState) {
+        std::ifstream inputFile(filePath);
+
+        if (!inputFile) {
+            LOG_ERROR("Failed to read {}", filePath);
+            exit(EXIT_FAILURE);
+        }
+
+        std::string line;
+        int lineCounter = 0;
+        int tileCounter = 0;
+        while (std::getline(inputFile, line)) {
+            if (lineCounter == 0) {
+                // load pos
+                int numParsed = 0;
+                size_t i = 0;
+                while (i < line.length()) {
+                    char c = line[i];
+                    switch (c) {
+                        case '(':
+                        case ')':
+                        case ',':
+                        case ' ':
+                            i++;
+                            break;
+                        default:
+                            // parse number
+                            {
+                                size_t start = i;
+                                while (i < line.length() - 1 &&
+                                        line[i + 1] != ',' &&
+                                        line[i + 1] != ')' &&
+                                        line[i + 1] != ' ') {
+                                    i++;
+                                }
+                                size_t numLen = i - start + 1;
+                                std::string numStr = line.substr(start, numLen);
+                                if (numParsed > 2) {
+                                    LOG_ERROR("Error while loading level file, player position is invalid");
+                                }
+                                levelState.playerPos[numParsed++] = std::stof(numStr);
+                                i++;
+                            }
+                            break;
+                    }
+                }
+            } else if (lineCounter == 1) {
+                // load cubeState
+                int numParsed = 0;
+                size_t i = 0;
+                while (i < line.length()) {
+                    char c = line[i];
+                    switch (c) {
+                        case '(':
+                        case ')':
+                        case ',':
+                        case ' ':
+                            i++;
+                            break;
+                        default:
+                            // parse number
+                            {
+                                size_t start = i;
+                                while (i < line.length() - 1 &&
+                                        line[i + 1] != ',' &&
+                                        line[i + 1] != ')' &&
+                                        line[i + 1] != ' ') {
+                                    i++;
+                                }
+                                size_t numLen = i - start + 1;
+                                std::string numStr = line.substr(start, numLen);
+                                if (numParsed > 5) {
+                                    LOG_ERROR("Error while loading level file, player rotation is invalid");
+                                }
+                                levelState.playerRot[numParsed++] = static_cast<Face>(std::stoi(numStr));
+                                i++;
+                            }
+                            break;
+                    }
+                }
+
+            } else if (lineCounter == 2) {
+                // load model matrix
+                int numParsed = 0;
+                size_t i = 0;
+                while (i < line.length()) {
+                    char c = line[i];
+                    switch (c) {
+                        case '[':
+                        case ']':
+                        case ',':
+                        case ' ':
+                            i++;
+                            break;
+                        default:
+                            // parse number
+                            {
+                                size_t start = i;
+                                while (i < line.length() - 1 &&
+                                        line[i + 1] != ',' &&
+                                        line[i + 1] != '[' &&
+                                        line[i + 1] != ']' &&
+                                        line[i + 1] != ' ') {
+                                    i++;
+                                }
+                                size_t numLen = i - start + 1;
+                                std::string numStr = line.substr(start, numLen);
+                                if (numParsed > 15) {
+                                    LOG_ERROR("Error while loading level file, model matrix is invalid");
+                                }
+                                int row = numParsed / 4;
+                                int col = numParsed % 4;
+                                levelState.model[row][col] = std::stof(numStr);
+                                numParsed++;
+                                i++;
+                            }
+                            break;
+                    }
+                }
+            } else {
+                // load tile map
+                for (char c : line) {
+                    switch (c) {
+                        case '.':
+                            levelState.tiles[tileCounter++] = TileType::EMPTY_TILE;
+                            break;
+                        case '#':
+                            levelState.tiles[tileCounter++] = TileType::GROUND_TILE;
+                            break;
+                        case 'D':
+                            levelState.tiles[tileCounter++] = TileType::DARK_TILE;
+                            break;
+                        case 'L':
+                            levelState.tiles[tileCounter++] = TileType::LIGHT_TILE;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+            lineCounter++;
+        }
+    }
+
+    void SaveLevelToFile(const char* filePath, const LevelState& levelState, int rowLength) {
+        std::ofstream outputFile(filePath);
+
+        if (!outputFile) {
+            LOG_ERROR("Failed at creating file {}", filePath);
+            exit(EXIT_FAILURE);
+        }
+
+        // save player pos
+        outputFile << "(" << levelState.playerPos[0] << ",";
+        outputFile << levelState.playerPos[1] << ",";
+        outputFile << levelState.playerPos[2] << ")\n";
+
+        // save player orientation (cube state)
+        outputFile << "(";
+        for (int i = 0; i < 6; i++) {
+            outputFile << (int)levelState.playerRot[i];
+            if (i != 5)
+                outputFile << ",";
+        }
+        outputFile << ")\n";
+
+        // save player orientation (model matrix)
+        outputFile << "[";
+        for (int i = 0; i < 4; i++) {
+            outputFile << "[";
+            for (int j = 0; j < 4; j++) {
+                outputFile << levelState.model[i][j];
+                if (j != 3)
+                    outputFile << ",";
+            }
+            outputFile << "]";
+            if (i != 3)
+                outputFile << ",";
+        }
+        outputFile << "]\n";
+
+        // save tiles map
+        int colCounter = 0;
+        for (auto tile : levelState.tiles) {
+            switch (tile) {
+                case TileType::EMPTY_TILE:
+                    outputFile << ".";
+                    break;
+                case TileType::GROUND_TILE:
+                    outputFile << "#";
+                    break;
+                case TileType::DARK_TILE:
+                    outputFile << "D";
+                    break;
+                case TileType::LIGHT_TILE:
+                    outputFile << "L";
+                    break;
+            }
+            colCounter++;
+            if (colCounter == rowLength) {
+                outputFile << "\n";
+                colCounter = 0;
+            }
+        }
+    }
+
+    void SaveCurrentLevel(LevelState& levelState) {
+        // feels weird to pass the levelState but at the same time it's more functional 
+        // but in this case maybe having a global state here makes more sense 
+        // than having it in main
+        static constexpr int sideNum = 100;
+        SaveLevelToFile(currentLevel, levelState, sideNum);
     }
 
 }

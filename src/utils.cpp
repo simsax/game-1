@@ -64,3 +64,4 @@ void APIENTRY glDebugOutput(GLenum source,
 
     std::cout << "\n";
 }
+

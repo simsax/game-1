@@ -3,7 +3,7 @@
 
 #include <vector>
 #include "mesh.h"
-#include "shader.h"
+#include <glm/glm.hpp>
 
 enum class TileType {
     EMPTY_TILE,
@@ -11,6 +11,8 @@ enum class TileType {
     DARK_TILE,
     LIGHT_TILE
 };
+
+struct LevelState;
 
 namespace levelEditor {
     /* namespace { */
@@ -46,11 +48,10 @@ namespace levelEditor {
     void AddCastedToSelected();
     void RemoveCastedFromSelected();
     void Update();
-    /* void Render(const glm::mat4& mvp); */
-
-    void Render(const glm::mat4& mvp,
-            bool* tilesNeedUpdate,
-            std::vector<TileType>& tiles); 
+    void Render(const glm::mat4& mvp, bool& tilesNeedUpdate, LevelState& levelState); 
+    void LoadLevelFromFile(const char* path, LevelState& levelState);
+    void SaveLevelToFile(const char* filePath, const LevelState& levelState, int rowLength);
+    void SaveCurrentLevel(LevelState& levelState);
 
     extern Mesh castedTileMesh;
     extern TileQuad castedTileQuad;
