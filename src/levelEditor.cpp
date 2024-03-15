@@ -1,11 +1,16 @@
 #include <fstream>
 #include <iostream>
+#include <filesystem>
 #include "levelEditor.h"
 #include "render.h"
 #include "logger.h"
 #include "imgui.h"
 #include "shader.h"
 #include "utils.h"
+
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+#define LEVEL(num) ABS_PATH("/res/levels/level_") STR(num) (".txt")
 
 enum class Face {
     U, F, D, B, L, R
@@ -44,7 +49,8 @@ namespace levelEditor {
     bool selectionNeedsUpdate = true;
     TileType activeTileTypeButton = TileType::EMPTY_TILE;
 
-    static char currentLevel[512];
+    static std::vector<std::string> levelPaths;
+    static int currentLevel = -1;
 
     // functions
     void Init(int sideLength, const glm::vec3& lineColor, const char* vertexShaderPath,
@@ -153,6 +159,9 @@ namespace levelEditor {
             selectedTilesShader = Shader(vertexShaderPath, selectedFragmentShaderPath);
         }
 
+        // scan levels directory and update counter
+        for (const auto& entry : std::filesystem::directory_iterator(ABS_PATH("/res/levels")))
+            levelPaths.push_back(entry.path());
     }
 
     void Update() {
@@ -235,45 +244,74 @@ namespace levelEditor {
         {
             ImGui::Begin("Editor");
 
+            // tiles buttons
             ImGui::SeparatorText("Edit tiles");
             if (ImGui::Button("Empty")) {
                 AddTiles(TileType::EMPTY_TILE, levelState.tiles);
                 tilesNeedUpdate = true;
             }
 
+            ImGui::SameLine();
             if (ImGui::Button("Ground")) {
                 AddTiles(TileType::GROUND_TILE, levelState.tiles);
                 tilesNeedUpdate = true;
             }
 
+            ImGui::SameLine();
             if (ImGui::Button("Dark")) {
                 AddTiles(TileType::DARK_TILE, levelState.tiles);
                 tilesNeedUpdate = true;
             }
 
+            ImGui::SameLine();
             if (ImGui::Button("Light")) {
                 AddTiles(TileType::LIGHT_TILE, levelState.tiles);
                 tilesNeedUpdate = true;
             }
 
             ImGui::SeparatorText("Level");
-            if (ImGui::Button("Reset current level")) {
+            if (ImGui::Button("Reset")) {
                 ResetLevelState(levelState);
                 tilesNeedUpdate = true;
             }
 
-            ImGui::Separator();
-            if (ImGui::Button("Level 1")) {
-                strncpy(currentLevel, ABS_PATH("/res/levels/level1.txt"), 512);
-                LoadLevelFromFile(currentLevel, levelState);
+            ImGui::SameLine();
+            if (ImGui::Button("Save")) {
+                SaveCurrentLevel(levelState);
                 tilesNeedUpdate = true;
             }
 
-            // add button to add new levels
-            // decide if by default to load the first level
-            // higlight loaded level
-            // if no level loaded by default, quitting should not 
-            // try to write
+            ImGui::Separator();
+
+            // level buttons
+            for (uint32_t i = 0; i < levelPaths.size(); i++) {
+                if ((int)i == currentLevel) {
+                    ImGui::PushStyleColor(ImGuiCol_Button, (ImVec4)ImColor::HSV(0.0f, 0.6f, 0.6f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(0.0f, 0.7f, 0.7f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(0.0f, 0.8f, 0.8f));
+                }
+
+                bool pressed = ImGui::Button(std::format("Level {}", i + 1).c_str());
+
+                if ((int)i == currentLevel) {
+                    ImGui::PopStyleColor(3);
+                }
+
+                if (pressed) {
+                    currentLevel = i;
+                    LoadLevelFromFile(levelPaths[currentLevel].c_str(), levelState);
+                    tilesNeedUpdate = true;
+                }
+            }
+
+            if (ImGui::Button("+")) {
+                currentLevel = levelPaths.size();
+                levelPaths.push_back(std::format(
+                            ABS_PATH("/res/levels/level_{}.txt"), levelPaths.size() + 1));
+                ResetLevelState(levelState);
+                SaveCurrentLevel(levelState);
+                tilesNeedUpdate = true;
+            }
 
             ImGui::End();
         }
@@ -509,8 +547,10 @@ namespace levelEditor {
         // feels weird to pass the levelState but at the same time it's more functional 
         // but in this case maybe having a global state here makes more sense 
         // than having it in main
-        static constexpr int sideNum = 100;
-        SaveLevelToFile(currentLevel, levelState, sideNum);
+        if (currentLevel != -1) {
+            static constexpr int sideNum = 100;
+            SaveLevelToFile(levelPaths[currentLevel].c_str(), levelState, sideNum);
+        }
     }
 
 }
