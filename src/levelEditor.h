@@ -9,7 +9,9 @@ enum class TileType {
     EMPTY_TILE,
     GROUND_TILE,
     DARK_TILE,
-    LIGHT_TILE
+    LIGHT_TILE,
+    TARGET_OFF_TILE,
+    TARGET_ON_TILE
 };
 
 struct LevelState;

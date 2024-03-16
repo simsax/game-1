@@ -213,6 +213,8 @@ int main() {
     ImGui_ImplOpenGL3_Init();
 
 
+    glm::vec3 frontFaceColor = hexToRgb(LIGHT_TILE_COLOR);
+    glm::vec3 backFaceColor = hexToRgb(TARGET_ON_TILE_COLOR);
     std::vector<Vertex> cubeVertices = {
         // up
         {glm::vec3(0.5f,  0.5f,  0.5f),  glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 1.0f)},
@@ -221,10 +223,10 @@ int main() {
         {glm::vec3(0.5f,  0.5f, -0.5f),  glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 0.0f)},
 
         // front
-        {glm::vec3(0.5f,   0.5f, 0.5f),  glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(0.5f,  -0.5f, 0.5f),  glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(1.0f, 0.0f)},
-        {glm::vec3(-0.5f, -0.5f, 0.5f),  glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(-0.5f,  0.5f, 0.5f),  glm::vec3(1.0f, 0.0f, 0.0f),  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(0.5f,   0.5f, 0.5f),  frontFaceColor,  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(0.5f,  -0.5f, 0.5f),  frontFaceColor,  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(-0.5f, -0.5f, 0.5f),  frontFaceColor,  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(-0.5f,  0.5f, 0.5f),  frontFaceColor,  glm::vec2(0.0f, 1.0f)},
 
         // down
         {glm::vec3(0.5f,  -0.5f,  0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 1.0f)},
@@ -233,10 +235,10 @@ int main() {
         {glm::vec3(-0.5f, -0.5f,  0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 1.0f)},
 
         // back
-        {glm::vec3(0.5f,   0.5f, -0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 1.0f)},
-        {glm::vec3(-0.5f,  0.5f, -0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 1.0f)},
-        {glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(0.0f, 0.0f)},
-        {glm::vec3(0.5f,  -0.5f, -0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 0.0f)},
+        {glm::vec3(0.5f,   0.5f, -0.5f), backFaceColor,  glm::vec2(1.0f, 1.0f)},
+        {glm::vec3(-0.5f,  0.5f, -0.5f), backFaceColor,  glm::vec2(0.0f, 1.0f)},
+        {glm::vec3(-0.5f, -0.5f, -0.5f), backFaceColor,  glm::vec2(0.0f, 0.0f)},
+        {glm::vec3(0.5f,  -0.5f, -0.5f), backFaceColor,  glm::vec2(1.0f, 0.0f)},
 
         // left
         {glm::vec3(-0.5f,  0.5f,  0.5f), glm::vec3(0.3f, 0.3f, 0.3f),  glm::vec2(1.0f, 1.0f)},
@@ -334,8 +336,6 @@ int main() {
     Camera camera = Camera(SCREEN_WIDTH, SCREEN_HEIGHT, 0.1f, 10000.0f, cameraPos, cameraFront,
             glm::vec3(0.0f, 1.0f, 0.0f), 10.0f, 10.0f, 0.1f, 20.0f);
     glm::vec3 absoluteTrans = glm::vec3(0.5f);
-
-
     glm::mat4 frozenModel = levelState.model;
     bool rotating = false;
     float angle = 0.0f;
@@ -354,6 +354,8 @@ int main() {
     bool shiftPressed = false;
     const glm::vec3 tileColor = hexToRgb(CAST_TILE);
     bool mouseOnUI = false;
+    bool leftMouseDown = false;
+    bool rightMouseDown = false;
 
 #define GET_TILE(x, z) ((z) + offset) * sideNum + (x) + offset
 
@@ -508,14 +510,10 @@ int main() {
                     if (!mouseOnUI) {
                         switch (event.button.button) {
                             case SDL_BUTTON_LEFT:
-                                if (levelEditor::castedTile != -1) {
-                                    levelEditor::AddCastedToSelected();
-                                }
+                                leftMouseDown = true;
                                 break;
                             case SDL_BUTTON_RIGHT:
-                                if (levelEditor::castedTile != -1) {
-                                    levelEditor::RemoveCastedFromSelected();
-                                }
+                                rightMouseDown = true;
                                 break;
                             case SDL_BUTTON_MIDDLE:
                                 wheelPressed = true;
@@ -527,8 +525,18 @@ int main() {
                     break;
                 case SDL_MOUSEBUTTONUP:
                     if (!mouseOnUI) {
-                        if (event.button.button == SDL_BUTTON_MIDDLE) {
-                            wheelPressed = false;
+                        switch (event.button.button) {
+                            case SDL_BUTTON_LEFT:
+                                leftMouseDown = false;
+                                break;
+                            case SDL_BUTTON_RIGHT:
+                                rightMouseDown = false;
+                                break;
+                            case SDL_BUTTON_MIDDLE:
+                                wheelPressed = false;
+                                break;
+                            default:
+                                break;
                         }
                     }
                     break;
@@ -576,6 +584,18 @@ int main() {
             prevTime = lastTime;
         }
 
+        if (leftMouseDown) {
+            if (levelEditor::castedTile != -1) {
+                levelEditor::AddCastedToSelected();
+            }
+        }
+
+        if (rightMouseDown) {
+            if (levelEditor::castedTile != -1) {
+                levelEditor::RemoveCastedFromSelected();
+            }
+        }
+
         camera.Update(deltaTime);
         levelEditor::Update();
 
@@ -599,6 +619,16 @@ int main() {
                     case TileType::LIGHT_TILE:
                         currentGroundVertices.push_back(tilesVertices[i]);
                         currentGroundVertices[numVisible].SetColor(hexToRgb(LIGHT_TILE_COLOR));
+                        numVisible++;
+                        break;
+                    case TileType::TARGET_ON_TILE:
+                        currentGroundVertices.push_back(tilesVertices[i]);
+                        currentGroundVertices[numVisible].SetColor(hexToRgb(TARGET_ON_TILE_COLOR));
+                        numVisible++;
+                        break;
+                    case TileType::TARGET_OFF_TILE:
+                        currentGroundVertices.push_back(tilesVertices[i]);
+                        currentGroundVertices[numVisible].SetColor(hexToRgb(TARGET_OFF_TILE_COLOR));
                         numVisible++;
                         break;
                     case TileType::EMPTY_TILE:
@@ -713,11 +743,22 @@ int main() {
                         break;
                 }
                 Face downFace = levelState.playerRot[(int)Orientation::DOWN];
-                if (downFace == Face::F) {
-                    if (levelState.playerPos.x >= 0 - offset && levelState.playerPos.z >= 0 - offset && levelState.playerPos.x < sideNum - offset && levelState.playerPos.z < sideNum - offset) {
-                        int tileIx = GET_TILE(levelState.playerPos.x, levelState.playerPos.z);
+                int tileIx = GET_TILE(levelState.playerPos.x, levelState.playerPos.z);
+
+                // check if it's a valid position
+                // TODO: find a better way that's not a hack
+                if (levelState.playerPos.x >= 0 - offset &&
+                    levelState.playerPos.z >= 0 - offset &&
+                    levelState.playerPos.x < sideNum - offset &&
+                    levelState.playerPos.z < sideNum - offset) {
+                    if (downFace == Face::F) {
                         if (levelState.tiles[tileIx] == TileType::DARK_TILE) {
                             levelState.tiles[tileIx] = TileType::LIGHT_TILE;
+                            tilesNeedUpdate = true;
+                        }
+                    } else {
+                        if (levelState.tiles[tileIx] == TileType::LIGHT_TILE) {
+                            levelState.tiles[tileIx] = TileType::DARK_TILE;
                             tilesNeedUpdate = true;
                         }
                     }

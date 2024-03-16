@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <filesystem>
+#include <unordered_set>
 #include "levelEditor.h"
 #include "render.h"
 #include "logger.h"
@@ -35,7 +36,7 @@ namespace levelEditor {
     std::vector<TileQuad> selectedTilesVertices;
     std::vector<uint32_t> gridIndices;
     std::vector<uint32_t> selectedTilesIndices;
-    std::vector<int> selectedTiles;
+    std::unordered_set<int> selectedTiles;
     std::vector<LineVertex> axisLines;
     std::vector<Layout> layout = { { GL_FLOAT, 3 }, { GL_FLOAT, 3 } };
     TileQuad castedTileQuad;
@@ -267,6 +268,20 @@ namespace levelEditor {
                 tilesNeedUpdate = true;
             }
 
+            ImGui::SameLine();
+            if (ImGui::Button("Target OFF")) {
+                AddTiles(TileType::TARGET_OFF_TILE, levelState.tiles);
+                tilesNeedUpdate = true;
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Target ON")) {
+                AddTiles(TileType::TARGET_ON_TILE, levelState.tiles);
+                tilesNeedUpdate = true;
+            }
+
+
+            // levels buttons
             ImGui::SeparatorText("Level");
             if (ImGui::Button("Reset")) {
                 ResetLevelState(levelState);
@@ -324,12 +339,12 @@ namespace levelEditor {
     }
 
     void AddCastedToSelected() {
-        selectedTiles.push_back(castedTile);
+        selectedTiles.insert(castedTile);
         selectionNeedsUpdate = true;
     }
 
     void RemoveCastedFromSelected() {
-        std::erase(selectedTiles, castedTile);
+        selectedTiles.erase(castedTile);
         selectionNeedsUpdate = true;
     }
 
@@ -468,6 +483,12 @@ namespace levelEditor {
                         case 'L':
                             levelState.tiles[tileCounter++] = TileType::LIGHT_TILE;
                             break;
+                        case 'O':
+                            levelState.tiles[tileCounter++] = TileType::TARGET_OFF_TILE;
+                            break;
+                        case 'T':
+                            levelState.tiles[tileCounter++] = TileType::TARGET_ON_TILE;
+                            break;
                         default:
                             break;
                     }
@@ -529,6 +550,12 @@ namespace levelEditor {
                     break;
                 case TileType::LIGHT_TILE:
                     outputFile << "L";
+                    break;
+                case TileType::TARGET_OFF_TILE:
+                    outputFile << "O";
+                    break;
+                case TileType::TARGET_ON_TILE:
+                    outputFile << "T";
                     break;
             }
             colCounter++;
