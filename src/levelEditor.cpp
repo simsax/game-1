@@ -8,9 +8,7 @@
 #include "shader.h"
 #include "utils.h"
 
-#define STR_HELPER(x) #x
-#define STR(x) STR_HELPER(x)
-#define LEVEL(num) ABS_PATH("/res/levels/level_") STR(num) (".txt")
+#define LEVEL_STR(levelNum) (std::format(ABS_PATH("/res/levels/level_{}.txt"), (levelNum) + 1).c_str())
 
 enum class Face {
     U, F, D, B, L, R
@@ -49,7 +47,7 @@ namespace levelEditor {
     bool selectionNeedsUpdate = true;
     TileType activeTileTypeButton = TileType::EMPTY_TILE;
 
-    static std::vector<std::string> levelPaths;
+    static int levelCounter = 0;
     static int currentLevel = -1;
 
     // functions
@@ -161,7 +159,7 @@ namespace levelEditor {
 
         // scan levels directory and update counter
         for (const auto& entry : std::filesystem::directory_iterator(ABS_PATH("/res/levels")))
-            levelPaths.push_back(entry.path());
+            levelCounter++;
     }
 
     void Update() {
@@ -284,8 +282,8 @@ namespace levelEditor {
             ImGui::Separator();
 
             // level buttons
-            for (uint32_t i = 0; i < levelPaths.size(); i++) {
-                if ((int)i == currentLevel) {
+            for (int i = 0; i < levelCounter; i++) {
+                if (i == currentLevel) {
                     ImGui::PushStyleColor(ImGuiCol_Button, (ImVec4)ImColor::HSV(0.0f, 0.6f, 0.6f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(0.0f, 0.7f, 0.7f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(0.0f, 0.8f, 0.8f));
@@ -299,15 +297,13 @@ namespace levelEditor {
 
                 if (pressed) {
                     currentLevel = i;
-                    LoadLevelFromFile(levelPaths[currentLevel].c_str(), levelState);
+                    LoadLevelFromFile(LEVEL_STR(currentLevel) , levelState);
                     tilesNeedUpdate = true;
                 }
             }
 
             if (ImGui::Button("+")) {
-                currentLevel = levelPaths.size();
-                levelPaths.push_back(std::format(
-                            ABS_PATH("/res/levels/level_{}.txt"), levelPaths.size() + 1));
+                currentLevel++;
                 ResetLevelState(levelState);
                 SaveCurrentLevel(levelState);
                 tilesNeedUpdate = true;
@@ -549,7 +545,7 @@ namespace levelEditor {
         // than having it in main
         if (currentLevel != -1) {
             static constexpr int sideNum = 100;
-            SaveLevelToFile(levelPaths[currentLevel].c_str(), levelState, sideNum);
+            SaveLevelToFile(LEVEL_STR(currentLevel), levelState, sideNum);
         }
     }
 

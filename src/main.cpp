@@ -26,9 +26,8 @@
 // this will be changed dynamically to allow resizing
 #define SCREEN_WIDTH 1920
 #define SCREEN_HEIGHT 1080
-
-
 #define SDL_ERROR() LOG_ERROR("SDL_Error: {}", SDL_GetError())
+
 
 enum class Rotation {
     DOWN,
@@ -356,6 +355,8 @@ int main() {
     const glm::vec3 tileColor = hexToRgb(CAST_TILE);
     bool mouseOnUI = false;
 
+#define GET_TILE(x, z) ((z) + offset) * sideNum + (x) + offset
+
     // game loop
     while(!quit) {
         mouseOnUI = io.WantCaptureMouse;
@@ -399,46 +400,58 @@ int main() {
                             break;
                         case SDLK_DOWN:
                             if (!rotating) {
-                                axis = glm::vec3(1,0,0);
-                                angle = 90.0f;
-                                rotating = true;
-                                frozenModel = levelState.model;
-                                translationAxis = glm::vec3(0, 0.5, -0.5);
-                                rotation = Rotation::DOWN;
-                                turn(levelState.playerRot, rotation);
+                                int tileIx = GET_TILE(levelState.playerPos.x, levelState.playerPos.z + 1);
+                                if (levelState.tiles[tileIx] != TileType::EMPTY_TILE) {
+                                    axis = glm::vec3(1,0,0);
+                                    angle = 90.0f;
+                                    rotating = true;
+                                    frozenModel = levelState.model;
+                                    translationAxis = glm::vec3(0, 0.5, -0.5);
+                                    rotation = Rotation::DOWN;
+                                    turn(levelState.playerRot, rotation);
+                                }
                             }
                             break;
                         case SDLK_UP:
                             if (!rotating) {
-                                axis = glm::vec3(1,0,0);
-                                angle = -90.0f;
-                                rotating = true;
-                                frozenModel = levelState.model;
-                                translationAxis = glm::vec3(0, 0.5, 0.5);
-                                rotation = Rotation::UP;
-                                turn(levelState.playerRot, rotation);
+                                int tileIx = GET_TILE(levelState.playerPos.x, levelState.playerPos.z - 1);
+                                if (levelState.tiles[tileIx] != TileType::EMPTY_TILE) {
+                                    axis = glm::vec3(1,0,0);
+                                    angle = -90.0f;
+                                    rotating = true;
+                                    frozenModel = levelState.model;
+                                    translationAxis = glm::vec3(0, 0.5, 0.5);
+                                    rotation = Rotation::UP;
+                                    turn(levelState.playerRot, rotation);
+                                }
                             }
                             break;
                         case SDLK_LEFT:
                             if (!rotating) {
-                                axis = glm::vec3(0,0,1);
-                                angle = 90.0f;
-                                rotating = true;
-                                frozenModel = levelState.model;
-                                translationAxis = glm::vec3(0.5, 0.5, 0);
-                                rotation = Rotation::LEFT;
-                                turn(levelState.playerRot, rotation);
+                                int tileIx = GET_TILE(levelState.playerPos.x - 1, levelState.playerPos.z);
+                                if (levelState.tiles[tileIx] != TileType::EMPTY_TILE) {
+                                    axis = glm::vec3(0,0,1);
+                                    angle = 90.0f;
+                                    rotating = true;
+                                    frozenModel = levelState.model;
+                                    translationAxis = glm::vec3(0.5, 0.5, 0);
+                                    rotation = Rotation::LEFT;
+                                    turn(levelState.playerRot, rotation);
+                                }
                             }
                             break;
                         case SDLK_RIGHT:
                             if (!rotating) {
                                 axis = glm::vec3(0,0,1);
-                                angle = -90.0f;
-                                rotating = true;
-                                frozenModel = levelState.model;
-                                translationAxis = glm::vec3(-0.5, 0.5, 0);
-                                rotation = Rotation::RIGHT;
-                                turn(levelState.playerRot, rotation);
+                                int tileIx = GET_TILE(levelState.playerPos.x + 1, levelState.playerPos.z);
+                                if (levelState.tiles[tileIx] != TileType::EMPTY_TILE) {
+                                    angle = -90.0f;
+                                    rotating = true;
+                                    frozenModel = levelState.model;
+                                    translationAxis = glm::vec3(-0.5, 0.5, 0);
+                                    rotation = Rotation::RIGHT;
+                                    turn(levelState.playerRot, rotation);
+                                }
                             }
                             break;
                         case SDLK_LSHIFT:
@@ -702,7 +715,7 @@ int main() {
                 Face downFace = levelState.playerRot[(int)Orientation::DOWN];
                 if (downFace == Face::F) {
                     if (levelState.playerPos.x >= 0 - offset && levelState.playerPos.z >= 0 - offset && levelState.playerPos.x < sideNum - offset && levelState.playerPos.z < sideNum - offset) {
-                        int tileIx = (levelState.playerPos.z + offset) * sideNum + levelState.playerPos.x + offset;
+                        int tileIx = GET_TILE(levelState.playerPos.x, levelState.playerPos.z);
                         if (levelState.tiles[tileIx] == TileType::DARK_TILE) {
                             levelState.tiles[tileIx] = TileType::LIGHT_TILE;
                             tilesNeedUpdate = true;
