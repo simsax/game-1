@@ -10,6 +10,9 @@ I'm making this public because why not.
 Below a video of what it currently looks like, I only implemented the editor and basic
 movement mechanics.
 
+https://github.com/user-attachments/assets/73e6233d-8e77-4459-ac70-816d5f3310db
+
+
 ## How to build
 
 The project expects GLAD to be present under `extern/glad`.
